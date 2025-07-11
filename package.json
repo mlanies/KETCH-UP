@@ -1,0 +1,25 @@
+{
+  "name": "telegram-wine-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot for wine education using Cloudflare Workers",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "deploy:preview": "wrangler deploy --env preview",
+    "test": "wrangler dev --local"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "wine",
+    "cloudflare",
+    "workers",
+    "google-sheets"
+  ],
+  "author": "Maksim Lanies",
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}
