@@ -172,6 +172,8 @@ export async function handleCallbackQuery(callbackQuery, env) {
       // Обработка профиля пользователя
       const { handleLearningCallback } = await import('./learning.js');
       await handleLearningCallback(data, chatId, messageId, env);
+    } else if (data === 'show_author') {
+      await sendAuthorInfo(chatId, env);
     }
     
     // Отвечаем на callback query
@@ -250,6 +252,9 @@ export async function sendMainMenu(chatId, env) {
       ],
       [
         { text: '🤖 Спросить у ИИ', callback_data: 'ask_ai' }
+      ],
+      [
+        { text: '👨‍💻 Автор разработки', callback_data: 'show_author' }
       ]
     ]
   };
@@ -524,4 +529,22 @@ export async function handleRefreshData(chatId, messageId, env) {
     console.error('Error refreshing data:', error);
     await sendMessage(chatId, '❌ Ошибка при обновлении данных. Попробуйте позже.', env);
   }
+} 
+
+// Добавим функцию отправки информации об авторе
+export async function sendAuthorInfo(chatId, env) {
+  const text = '👨‍💻 Автор разработки: Ланиес Максим\nКонтакты: m.lanies@2gc.ru';
+  
+  const keyboard = {
+    inline_keyboard: [
+      [
+        { text: '💸 Поблагодарить автора', url: 'https://yoomoney.ru/fundraise/1BEKKUL671V.250712' }
+      ],
+      [
+        { text: '🔙 Назад', callback_data: 'main_menu' }
+      ]
+    ]
+  };
+  
+  await sendMessageWithKeyboard(chatId, text, keyboard, env);
 } 
