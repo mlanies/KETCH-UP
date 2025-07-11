@@ -6,6 +6,7 @@ import { askCloudflareAI, askCloudflareAIWithWineContext } from './ai.js';
 import { getCategoryType } from '../utils/categories.js';
 import { handleMenuSection } from './menu.js';
 import { handleAlcoholSection, handleCategorySelection, handleShowCategory } from './alcohol.js';
+import { handleLearningCallback } from './learning.js';
 
 // Обработка входящих сообщений от Telegram
 export async function handleWebhook(request, env) {
@@ -159,6 +160,9 @@ export async function handleCallbackQuery(callbackQuery, env) {
       await handleShowCategory(data, chatId, messageId, env);
     } else if (data === 'refresh_data') {
       await handleRefreshData(chatId, messageId, env);
+    } else if (data.startsWith('learning_')) {
+      // Обработка callback query для обучения
+      await handleLearningCallback(data, chatId, messageId, env);
     }
     
     // Отвечаем на callback query
@@ -188,6 +192,7 @@ export async function sendWelcomeMessage(chatId, env) {
         { text: '🍷 Алкоголь', callback_data: 'section_alcohol' }
       ],
       [
+        { text: '🎓 Обучение', callback_data: 'learning_start' },
         { text: '🔍 Поиск по названию', callback_data: 'search_by_name' }
       ],
       [
@@ -216,6 +221,7 @@ export async function sendMainMenu(chatId, env) {
         { text: '🍷 Алкоголь', callback_data: 'section_alcohol' }
       ],
       [
+        { text: '🎓 Обучение', callback_data: 'learning_start' },
         { text: '🔍 Поиск по названию', callback_data: 'search_by_name' }
       ],
       [

@@ -16,6 +16,10 @@ import {
   handleRefreshData
 } from './handlers/telegram.js';
 import {
+  startLearning,
+  handleLearningCallback
+} from './handlers/learning.js';
+import {
   handleMenuSection
 } from './handlers/menu.js';
 import {
