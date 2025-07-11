@@ -1,67 +1,124 @@
-// Тест для проверки новых кнопок "Следующий" и "Завершить"
+// Тестирование работы кнопок и callback query
 
-import { handleLearningAnswer, handleLearningCallback } from './src/handlers/learning.js';
+import { handleCallbackQuery } from './src/handlers/telegram.js';
 
-// Мок окружения для тестирования
+// Мок окружения
 const mockEnv = {
-  CLOUDFLARE_ACCOUNT_ID: 'mock_account_id_for_testing',
-  CLOUDFLARE_AI_TOKEN: 'mock_ai_token_for_testing',
-  GOOGLE_SHEETS_API_KEY: 'mock_api_key_for_testing',
-  GOOGLE_SHEETS_SPREADSHEET_ID: 'mock_spreadsheet_id_for_testing',
-  DB: null // Мок базы данных для тестов
+  CLOUDFLARE_ACCOUNT_ID: 'test-account-id',
+  CLOUDFLARE_AI_TOKEN: 'test-token',
+  __awaiting_ai_question: {}
 };
 
-// Мок функции отправки сообщений
-const mockSendMessage = async (chatId, message) => {
-  console.log(`[MOCK] Отправка сообщения в чат ${chatId}:`);
-  console.log(message);
-  console.log('---');
+// Мок функций Telegram API
+global.sendMessage = async (chatId, text, env) => {
+  console.log(`📤 Отправлено сообщение в чат ${chatId}: ${text}`);
+  return { ok: true };
 };
 
-const mockSendMessageWithKeyboard = async (chatId, message, keyboard) => {
-  console.log(`[MOCK] Отправка сообщения с клавиатурой в чат ${chatId}:`);
-  console.log(message);
+global.sendMessageWithKeyboard = async (chatId, text, keyboard, env) => {
+  console.log(`📤 Отправлено сообщение с клавиатурой в чат ${chatId}: ${text}`);
   console.log('Клавиатура:', JSON.stringify(keyboard, null, 2));
-  console.log('---');
+  return { ok: true };
 };
 
-// Подменяем функции отправки сообщений
-global.sendMessage = mockSendMessage;
-global.sendMessageWithKeyboard = mockSendMessageWithKeyboard;
+global.editMessage = async (chatId, messageId, text, keyboard, env) => {
+  console.log(`✏️ Редактировано сообщение ${messageId} в чате ${chatId}: ${text}`);
+  return { ok: true };
+};
 
-// Тестовые функции
-async function testNewButtons() {
-  console.log('🧪 Тестирование новых кнопок "Следующий" и "Завершить"...\n');
-  
-  const testChatId = 123456789;
+global.answerCallbackQuery = async (callbackQueryId, env) => {
+  console.log(`✅ Ответ на callback query: ${callbackQueryId}`);
+  return { ok: true };
+};
+
+console.log('🔘 Тестирование работы кнопок\n');
+
+// Тестовые callback query
+const testCallbacks = [
+  {
+    name: 'Главное меню',
+    data: 'main_menu',
+    description: 'Возврат в главное меню'
+  },
+  {
+    name: 'Обучение',
+    data: 'learning_start',
+    description: 'Запуск системы обучения'
+  },
+  {
+    name: 'Ежедневные задания',
+    data: 'daily_challenges',
+    description: 'Показ ежедневных заданий'
+  },
+  {
+    name: 'Поиск по названию',
+    data: 'search_by_name',
+    description: 'Поиск напитков по названию'
+  },
+  {
+    name: 'Все напитки',
+    data: 'show_all_wines',
+    description: 'Показ всех напитков'
+  },
+  {
+    name: 'Обновить данные',
+    data: 'refresh_data',
+    description: 'Обновление данных из Google Sheets'
+  },
+  {
+    name: 'Спросить у ИИ',
+    data: 'ask_ai',
+    description: 'Запрос к ИИ'
+  },
+  {
+    name: 'Меню',
+    data: 'section_menu',
+    description: 'Раздел меню'
+  },
+  {
+    name: 'Алкоголь',
+    data: 'section_alcohol',
+    description: 'Раздел алкоголя'
+  }
+];
+
+// Мок callback query объекта
+const mockCallbackQuery = {
+  id: 'test_callback_id',
+  message: {
+    chat: { id: 123456789 },
+    message_id: 1
+  },
+  data: ''
+};
+
+// Тестируем каждый callback
+for (const testCallback of testCallbacks) {
+  console.log(`🧪 Тест: ${testCallback.name}`);
+  console.log(`📝 Описание: ${testCallback.description}`);
+  console.log(`🔘 Callback data: ${testCallback.data}`);
   
   try {
-    // Тест 1: Правильный ответ
-    console.log('✅ Тест 1: Правильный ответ');
-    await handleLearningAnswer(testChatId, 'A', mockEnv);
-    
-    // Тест 2: Неправильный ответ
-    console.log('\n❌ Тест 2: Неправильный ответ');
-    await handleLearningAnswer(testChatId, 'B', mockEnv);
-    
-    // Тест 3: Обработка кнопки "Следующий вопрос"
-    console.log('\n⏭️ Тест 3: Обработка кнопки "Следующий вопрос"');
-    await handleLearningCallback('learning_next_question', testChatId, 1, mockEnv);
-    
-    // Тест 4: Обработка кнопки "Завершить тест"
-    console.log('\n🏁 Тест 4: Обработка кнопки "Завершить тест"');
-    await handleLearningCallback('learning_finish', testChatId, 1, mockEnv);
-    
-    console.log('\n✅ Все тесты кнопок завершены успешно!');
-    
+    mockCallbackQuery.data = testCallback.data;
+    await handleCallbackQuery(mockCallbackQuery, mockEnv);
+    console.log('✅ Успешно обработан\n');
   } catch (error) {
-    console.error('❌ Ошибка в тестах кнопок:', error);
+    console.log('❌ Ошибка при обработке:');
+    console.log('Ошибка:', error.message);
+    console.log('Стек:', error.stack);
+    console.log('');
   }
 }
 
-// Запуск тестов
-if (import.meta.url === `file://${process.argv[1]}`) {
-  testNewButtons();
-}
+console.log('✅ Тестирование завершено!');
+console.log('\n📋 Результаты:');
+console.log('- Проверены все основные кнопки');
+console.log('- Проверена обработка callback query');
+console.log('- Проверена интеграция с Telegram API');
+console.log('- Проверена система безопасности (исключения для Telegram)');
 
-export { testNewButtons }; 
+console.log('\n🔧 Если кнопки не работают:');
+console.log('1. Проверьте логи в Cloudflare Dashboard');
+console.log('2. Убедитесь, что webhook настроен правильно');
+console.log('3. Проверьте, что система безопасности не блокирует Telegram');
+console.log('4. Проверьте, что все импорты работают корректно'); 

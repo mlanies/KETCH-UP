@@ -18,6 +18,10 @@ import { DailyChallengeSystem } from './dailyChallenges.js';
 // Состояния обучения для каждого пользователя
 const learningStates = new Map();
 
+// Кэш для вопросов
+const questionCache = new Map();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 минут
+
 // Типы вопросов для обучения
 const QUESTION_TYPES = {
   WINE_PAIRING: 'wine_pairing',
@@ -125,6 +129,26 @@ D) [вариант D]
   
   // Fallback - создаем простой вопрос
   return generateFallbackQuestion(randomWine, questionType);
+}
+
+// Функции для работы с кэшем
+function getCachedQuestions(category, questionType) {
+  const cacheKey = `${category}_${questionType}`;
+  const cached = questionCache.get(cacheKey);
+  
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.questions;
+  }
+  
+  return null;
+}
+
+function setCachedQuestions(category, questionType, questions) {
+  const cacheKey = `${category}_${questionType}`;
+  questionCache.set(cacheKey, {
+    questions,
+    timestamp: Date.now()
+  });
 }
 
 // Fallback вопросы если ИИ недоступен
@@ -303,14 +327,68 @@ async function sendNextQuestion(chatId, env) {
     return;
   }
   
-  const wines = await getWineData(env);
-  const questionTypes = Object.values(QUESTION_TYPES);
-  const randomType = questionTypes[Math.floor(Math.random() * questionTypes.length)];
-  
-  const question = generateFallbackQuestion(wines[Math.floor(Math.random() * wines.length)], randomType);
-  state.currentQuestion = question;
-  
-  const questionText = `❓ *Вопрос ${state.correctAnswers + 1}/${state.totalQuestions}*
+  try {
+    console.log('=== sendNextQuestion START ===');
+    console.log('chatId:', chatId);
+    console.log('state:', {
+      correctAnswers: state.correctAnswers,
+      totalQuestions: state.totalQuestions,
+      difficulty: state.difficulty
+    });
+    
+    const wines = await getWineData(env);
+    console.log('Wines loaded:', wines.length);
+    
+    // Выбираем тип вопроса на основе сложности и прогресса
+    const questionTypes = Object.values(QUESTION_TYPES);
+    let selectedType;
+    
+    // Прогрессивная сложность на основе статистики пользователя
+    const accuracy = state.correctAnswers > 0 ? state.correctAnswers / (state.correctAnswers + state.incorrectAnswers.length) : 0.5;
+    
+    if (accuracy > 0.8 && state.difficulty === 'beginner') {
+      // Повышаем сложность
+      state.difficulty = 'intermediate';
+      console.log('Upgrading difficulty to intermediate');
+    } else if (accuracy > 0.9 && state.difficulty === 'intermediate') {
+      // Повышаем сложность
+      state.difficulty = 'advanced';
+      console.log('Upgrading difficulty to advanced');
+    }
+    
+    // Выбираем тип вопроса на основе сложности
+    if (state.difficulty === 'beginner') {
+      selectedType = ['wine_pairing', 'country', 'description'][Math.floor(Math.random() * 3)];
+    } else if (state.difficulty === 'intermediate') {
+      selectedType = ['serving_temp', 'glassware', 'alcohol_content'][Math.floor(Math.random() * 3)];
+    } else {
+      selectedType = questionTypes[Math.floor(Math.random() * questionTypes.length)];
+    }
+    
+    console.log('Selected question type:', selectedType);
+    
+    // Пытаемся получить вопрос из кэша
+    const cachedQuestions = getCachedQuestions('general', selectedType);
+    let question;
+    
+    if (cachedQuestions && cachedQuestions.length > 0) {
+      question = cachedQuestions[Math.floor(Math.random() * cachedQuestions.length)];
+      console.log('Using cached question');
+    } else {
+      // Генерируем новый вопрос
+      const randomWine = wines[Math.floor(Math.random() * wines.length)];
+      question = generateFallbackQuestion(randomWine, selectedType);
+      
+      // Кэшируем вопрос
+      const questions = [question];
+      setCachedQuestions('general', selectedType, questions);
+      console.log('Generated and cached new question');
+    }
+    
+    state.currentQuestion = question;
+    
+    const questionText = `❓ *Вопрос ${state.correctAnswers + 1}/${state.totalQuestions}*
+🎯 Сложность: ${state.difficulty === 'beginner' ? '🟢 Новичок' : state.difficulty === 'intermediate' ? '🟡 Средний' : '🔴 Продвинутый'}
 
 ${question.question}
 
@@ -320,21 +398,29 @@ ${question.question}
 В. ${question.options.C}
 Г. ${question.options.D}`;
 
-  const keyboard = {
-    inline_keyboard: [
-      [
-        { text: 'А', callback_data: `learning_answer_A` },
-        { text: 'Б', callback_data: `learning_answer_B` },
-        { text: 'В', callback_data: `learning_answer_C` },
-        { text: 'Г', callback_data: `learning_answer_D` }
-      ],
-      [
-        { text: '🔙 Завершить тест', callback_data: 'learning_finish' }
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: 'А', callback_data: `learning_answer_A` },
+          { text: 'Б', callback_data: `learning_answer_B` },
+          { text: 'В', callback_data: `learning_answer_C` },
+          { text: 'Г', callback_data: `learning_answer_D` }
+        ],
+        [
+          { text: '💡 Подсказка', callback_data: 'learning_hint' },
+          { text: '🔙 Завершить тест', callback_data: 'learning_finish' }
+        ]
       ]
-    ]
-  };
-  
-  await sendMessageWithKeyboard(chatId, questionText, keyboard, env);
+    };
+    
+    console.log('Sending question with keyboard...');
+    await sendMessageWithKeyboard(chatId, questionText, keyboard, env);
+    console.log('=== sendNextQuestion END ===');
+  } catch (error) {
+    console.error('Error in sendNextQuestion:', error);
+    console.error('Error stack:', error.stack);
+    await sendMessage(chatId, '❌ Ошибка загрузки вопроса. Попробуйте позже.', env);
+  }
 }
 
 // Отправка ИИ-вопроса
@@ -731,8 +817,14 @@ export async function handleLearningCallback(data, chatId, messageId, env) {
       await startPersonalizedTest(chatId, env);
     } else if (data === 'learning_export_data') {
       await exportLearningData(chatId, env);
+    } else if (data === 'learning_charts') {
+      await showLearningCharts(chatId, env);
     } else if (data === 'learning_next_question') {
       await sendNextQuestionBasedOnLesson(chatId, env);
+    } else if (data === 'learning_hint') {
+      await showHint(chatId, env);
+    } else if (data === 'learning_back_to_question') {
+      await showCurrentQuestion(chatId, env);
     } else if (data === 'user_profile') {
       await showUserProfile(chatId, env);
     } else if (data === 'daily_challenges') {
@@ -741,6 +833,14 @@ export async function handleLearningCallback(data, chatId, messageId, env) {
         console.log('chatId:', chatId);
         console.log('env keys:', Object.keys(env));
         console.log('About to call showDailyChallenges...');
+        
+        // Проверяем, что env содержит необходимые ключи
+        if (!env.DB) {
+          console.error('DB not found in env');
+          await sendMessage(chatId, '❌ Ошибка: база данных недоступна', env);
+          return;
+        }
+        
         await showDailyChallenges(chatId, env);
         console.log('Handling daily_challenges callback - END');
       } catch (error) {
@@ -783,21 +883,36 @@ async function showUserProfile(chatId, env) {
 async function showDailyChallenges(chatId, env) {
   console.log('=== showDailyChallenges FUNCTION ENTRY ===');
   console.log('Function called with chatId:', chatId);
-  console.log('Function called with env:', env);
+  console.log('Function called with env keys:', Object.keys(env));
   
   try {
-    console.log('showDailyChallenges called with chatId:', chatId);
+    console.log('Creating DatabaseManager...');
     const database = new DatabaseManager(env);
-    console.log('Database manager created');
-    const dailyChallenges = new DailyChallengeSystem(database, env);
-    console.log('DailyChallengeSystem created');
+    console.log('Database manager created successfully');
     
+    console.log('Creating DailyChallengeSystem...');
+    const dailyChallenges = new DailyChallengeSystem(database, env);
+    console.log('DailyChallengeSystem created successfully');
+    
+    console.log('Calling dailyChallenges.showDailyChallenges...');
     await dailyChallenges.showDailyChallenges(chatId);
     console.log('showDailyChallenges completed successfully');
   } catch (error) {
     console.error('Error in showDailyChallenges function:', error);
     console.error('Error stack:', error.stack);
-    await sendMessage(chatId, '❌ Ошибка загрузки ежедневных заданий', env);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    
+    // Отправляем более информативное сообщение об ошибке
+    const errorMessage = `❌ Ошибка загрузки ежедневных заданий
+
+🔍 Детали ошибки:
+• Тип: ${error.name}
+• Сообщение: ${error.message}
+
+Попробуйте позже или обратитесь к администратору.`;
+    
+    await sendMessage(chatId, errorMessage, env);
   }
 }
 
@@ -959,6 +1074,147 @@ async function startCategorySpecificLesson(chatId, category, env) {
   
   await sendMessage(chatId, `📚 Начинаем урок по категории: ${category}\n\nБудет задано ${state.totalQuestions} вопросов.`, env);
   await sendNextCategoryQuestion(chatId, env);
+}
+
+// Показать графики обучения
+async function showLearningCharts(chatId, env) {
+  try {
+    const { createCategoryProgressChart, createQuestionTypeProgressChart, createWeeklyProgressChart } = await import('./learningAnalytics.js');
+    
+    // Получаем аналитику пользователя (симуляция)
+    const mockAnalytics = {
+      categoryPerformance: new Map([
+        ['Вина', { correct: 15, total: 20 }],
+        ['Коктейли', { correct: 8, total: 12 }],
+        ['Крепкие напитки', { correct: 12, total: 15 }]
+      ]),
+      questionTypePerformance: new Map([
+        ['wine_pairing', { correct: 10, total: 15 }],
+        ['serving_temp', { correct: 8, total: 10 }],
+        ['glassware', { correct: 6, total: 8 }]
+      ])
+    };
+    
+    let chartsText = `📊 *Графики прогресса обучения*\n\n`;
+    
+    // График по категориям
+    const categoryChart = createCategoryProgressChart(mockAnalytics);
+    chartsText += categoryChart + '\n';
+    
+    // График по типам вопросов
+    const typeChart = createQuestionTypeProgressChart(mockAnalytics);
+    chartsText += typeChart + '\n';
+    
+    // График еженедельного прогресса
+    const weeklyChart = createWeeklyProgressChart(mockAnalytics);
+    chartsText += weeklyChart + '\n';
+    
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: '📈 Детальная аналитика', callback_data: 'learning_detailed_analytics' },
+          { text: '🏆 Достижения', callback_data: 'learning_achievements' }
+        ],
+        [
+          { text: '🔙 Назад', callback_data: 'learning_start' }
+        ]
+      ]
+    };
+    
+    await sendMessageWithKeyboard(chatId, chartsText, keyboard, env);
+  } catch (error) {
+    console.error('Error showing learning charts:', error);
+    await sendMessage(chatId, '❌ Ошибка загрузки графиков.', env);
+  }
+}
+
+// Показать текущий вопрос
+async function showCurrentQuestion(chatId, env) {
+  const state = learningStates.get(chatId);
+  if (!state || !state.currentQuestion) {
+    await sendMessage(chatId, '❌ Нет активного вопроса.', env);
+    return;
+  }
+  
+  try {
+    const question = state.currentQuestion;
+    
+    const questionText = `❓ *Вопрос ${state.correctAnswers + 1}/${state.totalQuestions}*
+🎯 Сложность: ${state.difficulty === 'beginner' ? '🟢 Новичок' : state.difficulty === 'intermediate' ? '🟡 Средний' : '🔴 Продвинутый'}
+
+${question.question}
+
+*Варианты ответов:*
+А. ${question.options.A}
+Б. ${question.options.B}
+В. ${question.options.C}
+Г. ${question.options.D}`;
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: 'А', callback_data: `learning_answer_A` },
+          { text: 'Б', callback_data: `learning_answer_B` },
+          { text: 'В', callback_data: `learning_answer_C` },
+          { text: 'Г', callback_data: `learning_answer_D` }
+        ],
+        [
+          { text: '💡 Подсказка', callback_data: 'learning_hint' },
+          { text: '🔙 Завершить тест', callback_data: 'learning_finish' }
+        ]
+      ]
+    };
+    
+    await sendMessageWithKeyboard(chatId, questionText, keyboard, env);
+  } catch (error) {
+    console.error('Error showing current question:', error);
+    await sendMessage(chatId, '❌ Ошибка отображения вопроса.', env);
+  }
+}
+
+// Показать подсказку для текущего вопроса
+async function showHint(chatId, env) {
+  const state = learningStates.get(chatId);
+  if (!state || !state.currentQuestion) {
+    await sendMessage(chatId, '❌ Нет активного вопроса для подсказки.', env);
+    return;
+  }
+  
+  try {
+    const question = state.currentQuestion;
+    let hint = '';
+    
+    // Генерируем подсказку на основе типа вопроса
+    switch (question.questionType || 'general') {
+      case 'wine_pairing':
+        hint = '💡 *Подсказка:* Обратите внимание на тип вина (красное/белое/розовое) и его характеристики (сухое/полусухое/сладкое). Красные вина обычно сочетаются с мясом, белые - с рыбой и морепродуктами.';
+        break;
+      case 'serving_temp':
+        hint = '💡 *Подсказка:* Температура подачи зависит от типа напитка. Вина обычно подаются при 8-18°C, крепкие напитки - при комнатной температуре, игристые вина - охлажденными.';
+        break;
+      case 'glassware':
+        hint = '💡 *Подсказка:* Форма бокала влияет на вкус напитка. Бокалы для вина имеют широкую чашу, флейты - узкую и высокую для игристых вин.';
+        break;
+      case 'country':
+        hint = '💡 *Подсказка:* Обратите внимание на регион происхождения напитка. Разные страны известны своими традициями виноделия.';
+        break;
+      default:
+        hint = '💡 *Подсказка:* Внимательно прочитайте вопрос и все варианты ответов. Исключите явно неправильные варианты.';
+    }
+    
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: '🔙 К вопросу', callback_data: 'learning_back_to_question' }
+        ]
+      ]
+    };
+    
+    await sendMessageWithKeyboard(chatId, hint, keyboard, env);
+  } catch (error) {
+    console.error('Error showing hint:', error);
+    await sendMessage(chatId, '❌ Ошибка загрузки подсказки.', env);
+  }
 }
 
 // Отправка вопроса по категории

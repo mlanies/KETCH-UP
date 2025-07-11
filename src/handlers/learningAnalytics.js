@@ -333,16 +333,21 @@ export async function showDetailedAnalytics(chatId, env) {
   analyticsText += `🎯 Средняя точность: ${Math.round(analytics.getOverallAccuracy() * 100)}%\n`;
   analyticsText += `🔥 Лучшая серия: ${analytics.learningStreak} правильных ответов\n\n`;
   
-  // Статистика по типам вопросов
-  if (analytics.questionTypePerformance.size > 0) {
-    analyticsText += `📝 *По типам вопросов:*\n`;
-    for (const [type, stats] of analytics.questionTypePerformance) {
-      const typeAccuracy = stats.correct / stats.total;
-      const typeName = getQuestionTypeName(type);
-      analyticsText += `• ${typeName}: ${stats.correct}/${stats.total} (${Math.round(typeAccuracy * 100)}%)\n`;
-    }
-    analyticsText += '\n';
+  // График прогресса по категориям
+  if (analytics.categoryPerformance.size > 0) {
+    const categoryChart = createCategoryProgressChart(analytics);
+    analyticsText += categoryChart + '\n';
   }
+  
+  // График прогресса по типам вопросов
+  if (analytics.questionTypePerformance.size > 0) {
+    const typeChart = createQuestionTypeProgressChart(analytics);
+    analyticsText += typeChart + '\n';
+  }
+  
+  // График еженедельного прогресса
+  const weeklyChart = createWeeklyProgressChart(analytics);
+  analyticsText += weeklyChart + '\n';
   
   // Рекомендации
   const recommendations = analytics.generateRecommendations();
@@ -358,6 +363,10 @@ export async function showDetailedAnalytics(chatId, env) {
       [
         { text: '🎯 Персонализированный тест', callback_data: 'learning_personalized_test' },
         { text: '📊 Экспорт данных', callback_data: 'learning_export_data' }
+      ],
+      [
+        { text: '📈 Графики', callback_data: 'learning_charts' },
+        { text: '🏆 Достижения', callback_data: 'learning_achievements' }
       ],
       [
         { text: '🔙 Назад', callback_data: 'learning_start' }
@@ -403,4 +412,66 @@ export function exportUserData(chatId) {
   };
   
   return JSON.stringify(exportData, null, 2);
+}
+
+// Создание текстового графика прогресса
+export function createProgressChart(data, title, maxValue = 100) {
+  const chartWidth = 20;
+  const filledChar = '█';
+  const emptyChar = '░';
+  
+  let chart = `📊 *${title}*\n`;
+  chart += '┌' + '─'.repeat(chartWidth + 2) + '┐\n';
+  
+  for (const [label, value] of Object.entries(data)) {
+    const percentage = Math.min((value / maxValue) * 100, 100);
+    const filledWidth = Math.round((percentage / 100) * chartWidth);
+    const emptyWidth = chartWidth - filledWidth;
+    
+    const bar = filledChar.repeat(filledWidth) + emptyChar.repeat(emptyWidth);
+    const percentageText = Math.round(percentage).toString().padStart(3);
+    
+    chart += `│ ${bar} │ ${percentageText}%\n`;
+  }
+  
+  chart += '└' + '─'.repeat(chartWidth + 2) + '┘\n';
+  return chart;
+}
+
+// Создание графика прогресса по категориям
+export function createCategoryProgressChart(analytics) {
+  const categoryData = {};
+  
+  for (const [category, stats] of analytics.categoryPerformance) {
+    const accuracy = stats.total > 0 ? (stats.correct / stats.total) * 100 : 0;
+    categoryData[category] = accuracy;
+  }
+  
+  return createProgressChart(categoryData, 'Прогресс по категориям');
+}
+
+// Создание графика прогресса по типам вопросов
+export function createQuestionTypeProgressChart(analytics) {
+  const typeData = {};
+  
+  for (const [type, stats] of analytics.questionTypePerformance) {
+    const accuracy = stats.total > 0 ? (stats.correct / stats.total) * 100 : 0;
+    const typeName = getQuestionTypeName(type);
+    typeData[typeName] = accuracy;
+  }
+  
+  return createProgressChart(typeData, 'Прогресс по типам вопросов');
+}
+
+// Создание графика еженедельного прогресса
+export function createWeeklyProgressChart(analytics) {
+  // Симуляция данных за неделю (в реальной системе данные должны браться из БД)
+  const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+  const weeklyData = {};
+  
+  weekDays.forEach(day => {
+    weeklyData[day] = Math.random() * 100; // Заглушка, в реальности - данные из БД
+  });
+  
+  return createProgressChart(weeklyData, 'Прогресс за неделю');
 } 

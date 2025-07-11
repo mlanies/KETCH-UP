@@ -163,6 +163,11 @@ export async function handleCallbackQuery(callbackQuery, env) {
     } else if (data.startsWith('learning_')) {
       // Обработка callback query для обучения
       await handleLearningCallback(data, chatId, messageId, env);
+    } else if (data === 'daily_challenges') {
+      // Обработка ежедневных заданий
+      console.log('Handling daily challenges callback');
+      const { handleLearningCallback } = await import('./learning.js');
+      await handleLearningCallback(data, chatId, messageId, env);
     } else if (data === 'user_profile') {
       // Обработка профиля пользователя
       const { handleLearningCallback } = await import('./learning.js');
@@ -170,10 +175,19 @@ export async function handleCallbackQuery(callbackQuery, env) {
     }
     
     // Отвечаем на callback query
-    await answerCallbackQuery(callbackQuery.id, env);
+    try {
+      await answerCallbackQuery(callbackQuery.id, env);
+    } catch (callbackError) {
+      console.error('Failed to answer callback query:', callbackError);
+      // Не прерываем выполнение, если не удалось ответить на callback
+    }
   } catch (error) {
     console.error('Callback query error:', error);
-    await sendMessage(chatId, 'Произошла ошибка. Попробуйте позже.', env);
+    try {
+      await sendMessage(chatId, 'Произошла ошибка. Попробуйте позже.', env);
+    } catch (sendError) {
+      console.error('Failed to send error message:', sendError);
+    }
   }
 }
 

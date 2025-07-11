@@ -440,5 +440,96 @@ export const ACHIEVEMENT_TYPES = {
     condition: (stats) => stats.totalScore >= 1000,
     icon: '🏆',
     points: 200
+  },
+  
+  // Новые достижения
+  PERFECT_ACCURACY: {
+    id: 'perfect_accuracy',
+    name: 'Точность 100%',
+    description: 'Пройдите тест с идеальной точностью (минимум 5 вопросов)',
+    condition: (stats) => stats.accuracy >= 100 && stats.totalQuestions >= 5,
+    icon: '🎯',
+    points: 150
+  },
+  
+  DAILY_WARRIOR: {
+    id: 'daily_warrior',
+    name: 'Ежедневный воин',
+    description: 'Выполните 7 ежедневных заданий подряд',
+    condition: (stats) => stats.consecutiveDays >= 7,
+    icon: '📅',
+    points: 100
+  },
+  
+  SPEED_DEMON: {
+    id: 'speed_demon',
+    name: 'Скоростной демон',
+    description: 'Ответьте на 10 вопросов быстрее чем за 2 минуты',
+    condition: (stats) => stats.fastAnswers >= 10,
+    icon: '⚡',
+    points: 75
+  },
+  
+  KNOWLEDGE_SEEKER: {
+    id: 'knowledge_seeker',
+    name: 'Искатель знаний',
+    description: 'Изучите 50 разных напитков',
+    condition: (stats) => stats.uniqueWines >= 50,
+    icon: '🔍',
+    points: 125
+  },
+  
+  WEEKEND_LEARNER: {
+    id: 'weekend_learner',
+    name: 'Выходной ученик',
+    description: 'Занимайтесь в течение 4 выходных подряд',
+    condition: (stats) => stats.weekendSessions >= 4,
+    icon: '🌅',
+    points: 80
+  },
+  
+  MORNING_PERSON: {
+    id: 'morning_person',
+    name: 'Ранняя пташка',
+    description: 'Занимайтесь 5 раз до 9 утра',
+    condition: (stats) => stats.morningSessions >= 5,
+    icon: '🌅',
+    points: 60
+  },
+  
+  NIGHT_OWL: {
+    id: 'night_owl',
+    name: 'Ночная сова',
+    description: 'Занимайтесь 5 раз после 22:00',
+    condition: (stats) => stats.nightSessions >= 5,
+    icon: '🦉',
+    points: 60
+  },
+  
+  SOCIAL_BUTTERFLY: {
+    id: 'social_butterfly',
+    name: 'Социальная бабочка',
+    description: 'Поделитесь результатами 3 раза',
+    condition: (stats) => stats.sharedResults >= 3,
+    icon: '🦋',
+    points: 40
+  },
+  
+  CONSISTENCY_KING: {
+    id: 'consistency_king',
+    name: 'Король постоянства',
+    description: 'Занимайтесь 30 дней подряд',
+    condition: (stats) => stats.consecutiveDays >= 30,
+    icon: '👑',
+    points: 300
+  },
+  
+  EXPLORER: {
+    id: 'explorer',
+    name: 'Исследователь',
+    description: 'Попробуйте все типы вопросов',
+    condition: (stats) => stats.questionTypes >= 8,
+    icon: '🗺️',
+    points: 90
   }
 }; 

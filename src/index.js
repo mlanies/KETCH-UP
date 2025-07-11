@@ -50,6 +50,11 @@ import {
   testAI
 } from './handlers/ai.js';
 import {
+  applySecurityChecks,
+  getSecurityStats,
+  cleanupSecurityCache
+} from './handlers/security.js';
+import {
   setWebhook,
   deleteWebhook,
   getBotStatus,
@@ -78,6 +83,14 @@ export default {
     }
 
     const url = new URL(request.url);
+    
+    // Применяем проверки безопасности (кроме OPTIONS и Telegram webhook)
+    if (url.pathname !== '/webhook') {
+      const securityCheck = await applySecurityChecks(request, env);
+      if (!securityCheck.allowed) {
+        return securityCheck.response;
+      }
+    }
     
     // Обработка веб-хука от Telegram
     if (url.pathname === '/webhook' && request.method === 'POST') {
@@ -169,6 +182,16 @@ export default {
 
     if (url.pathname === '/export-data' && request.method === 'POST') {
       return exportUserData(request, env);
+    }
+    
+    // Статистика безопасности
+    if (url.pathname === '/security-stats' && request.method === 'GET') {
+      return getSecurityStatsEndpoint(env);
+    }
+    
+    // Очистка кэша безопасности
+    if (url.pathname === '/cleanup-security' && request.method === 'POST') {
+      return cleanupSecurityEndpoint(env);
     }
 
     return new Response('Telegram Wine Bot is running!', {
@@ -517,6 +540,57 @@ async function testCocktailsIds(env) {
     });
   } catch (error) {
     console.error('Error testing cocktail IDs:', error);
+    return new Response(JSON.stringify({
+      error: error.message
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+// Эндпоинт для получения статистики безопасности
+async function getSecurityStatsEndpoint(env) {
+  try {
+    const stats = getSecurityStats();
+    
+    return new Response(JSON.stringify({
+      success: true,
+      stats: stats,
+      timestamp: new Date().toISOString()
+    }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('Security stats error:', error);
+    return new Response(JSON.stringify({
+      error: error.message
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+// Эндпоинт для очистки кэша безопасности
+async function cleanupSecurityEndpoint(env) {
+  try {
+    const beforeSize = getSecurityStats().cacheSize;
+    cleanupSecurityCache();
+    const afterSize = getSecurityStats().cacheSize;
+    
+    return new Response(JSON.stringify({
+      success: true,
+      message: 'Security cache cleaned',
+      beforeSize: beforeSize,
+      afterSize: afterSize,
+      cleared: beforeSize - afterSize,
+      timestamp: new Date().toISOString()
+    }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('Cleanup security error:', error);
     return new Response(JSON.stringify({
       error: error.message
     }), {

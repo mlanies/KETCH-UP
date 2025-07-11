@@ -50,67 +50,120 @@ export class DailyChallengeSystem {
   // Генерация ежедневного задания
   async generateDailyChallenge(chatId) {
     try {
+      console.log('=== generateDailyChallenge START ===');
+      console.log('chatId:', chatId);
+      
       const today = new Date().toDateString();
+      console.log('Today:', today);
+      
       const challengeType = this.getRandomChallengeType();
+      console.log('Selected challenge type:', challengeType);
       
       const challengeId = `${challengeType.id}_${today}`;
+      console.log('Generated challenge ID:', challengeId);
       
       // Проверяем, не существует ли уже задание на сегодня
-      const existing = await this.database.db.prepare(`
+      const checkQuery = `
         SELECT id FROM daily_challenges 
         WHERE chat_id = ? AND challenge_id = ? AND created_date = CURRENT_DATE
-      `).bind(chatId, challengeId).first();
+      `;
+      console.log('Checking existing challenge with query:', checkQuery);
+      
+      const existing = await this.database.db.prepare(checkQuery).bind(chatId, challengeId).first();
+      console.log('Existing challenge check result:', existing);
 
       if (existing) {
+        console.log('Challenge already exists, skipping generation');
         return null; // Задание уже существует
       }
 
       // Создаем новое задание
-      await this.database.db.prepare(`
+      const insertQuery = `
         INSERT INTO daily_challenges (
           chat_id, challenge_id, challenge_type, challenge_name, 
           description, target_value, reward_points, reward_experience
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(
+      `;
+      
+      const insertParams = [
         chatId, challengeId, challengeType.id, challengeType.name,
         challengeType.description, challengeType.target,
         challengeType.reward.points, challengeType.reward.experience
-      ).run();
+      ];
+      
+      console.log('Inserting new challenge with query:', insertQuery);
+      console.log('Insert parameters:', insertParams);
+      
+      const result = await this.database.db.prepare(insertQuery).bind(...insertParams).run();
+      console.log('Insert result:', result);
 
-      return {
+      const generatedChallenge = {
         id: challengeId,
         type: challengeType,
         date: today,
         progress: 0,
         completed: false
       };
+      
+      console.log('Generated challenge object:', generatedChallenge);
+      console.log('=== generateDailyChallenge END ===');
+      
+      return generatedChallenge;
     } catch (error) {
       console.error('Error generating daily challenge:', error);
+      console.error('Error stack:', error.stack);
+      console.error('Error name:', error.name);
+      console.error('Error message:', error.message);
       return null;
     }
   }
 
   // Получение случайного типа задания
   getRandomChallengeType() {
+    console.log('=== getRandomChallengeType START ===');
     const types = Object.values(DailyChallengeSystem.CHALLENGE_TYPES);
-    return types[Math.floor(Math.random() * types.length)];
+    console.log('Available challenge types:', types);
+    console.log('Types count:', types.length);
+    
+    const selectedType = types[Math.floor(Math.random() * types.length)];
+    console.log('Selected challenge type:', selectedType);
+    console.log('=== getRandomChallengeType END ===');
+    
+    return selectedType;
   }
 
   // Получение активных заданий пользователя
   async getActiveChallenges(chatId) {
     try {
-      const challenges = await this.database.db.prepare(`
+      console.log('=== getActiveChallenges START ===');
+      console.log('chatId:', chatId);
+      console.log('Database instance exists:', !!this.database);
+      console.log('Database.db exists:', !!this.database?.db);
+      
+      const query = `
         SELECT challenge_id, challenge_type, challenge_name, description,
                target_value, current_progress, is_completed,
                reward_points, reward_experience, created_date
         FROM daily_challenges 
         WHERE chat_id = ? AND created_date = CURRENT_DATE
         ORDER BY created_date DESC
-      `).bind(chatId).all();
-
-      return challenges.results;
+      `;
+      
+      console.log('Executing query:', query);
+      console.log('Query parameters:', [chatId]);
+      
+      const challenges = await this.database.db.prepare(query).bind(chatId).all();
+      console.log('Query result:', challenges);
+      console.log('Challenges results:', challenges.results);
+      console.log('Challenges count:', challenges.results?.length || 0);
+      
+      console.log('=== getActiveChallenges END ===');
+      return challenges.results || [];
     } catch (error) {
       console.error('Error getting active challenges:', error);
+      console.error('Error stack:', error.stack);
+      console.error('Error name:', error.name);
+      console.error('Error message:', error.message);
       return [];
     }
   }
@@ -266,42 +319,86 @@ ${challenge.description}
   // Отображение ежедневных заданий
   async showDailyChallenges(chatId) {
     try {
-      console.log('DailyChallengeSystem.showDailyChallenges called for chatId:', chatId);
-      console.log('Database instance:', this.database);
-      console.log('Env passed to DailyChallengeSystem:', this.env);
+      console.log('=== DailyChallengeSystem.showDailyChallenges START ===');
+      console.log('chatId:', chatId);
+      console.log('Database instance exists:', !!this.database);
+      console.log('Env keys:', Object.keys(this.env));
       
+      // Проверяем подключение к базе данных
+      if (!this.database || !this.database.db) {
+        throw new Error('Database connection not available');
+      }
+      
+      console.log('Getting active challenges...');
       const challenges = await this.getActiveChallenges(chatId);
       console.log('Active challenges retrieved:', challenges);
+      console.log('Challenges count:', challenges.length);
       
       if (challenges.length === 0) {
         console.log('No active challenges, generating new ones...');
+        
         // Генерируем новые задания
+        console.log('Generating challenge 1...');
         const challenge1 = await this.generateDailyChallenge(chatId);
         console.log('Generated challenge 1:', challenge1);
+        
+        console.log('Generating challenge 2...');
         const challenge2 = await this.generateDailyChallenge(chatId);
         console.log('Generated challenge 2:', challenge2);
+        
+        console.log('Generating challenge 3...');
         const challenge3 = await this.generateDailyChallenge(chatId);
         console.log('Generated challenge 3:', challenge3);
         
+        console.log('Getting newly generated challenges...');
         const newChallenges = await this.getActiveChallenges(chatId);
         console.log('New challenges generated:', newChallenges);
+        console.log('New challenges count:', newChallenges.length);
+        
+        if (newChallenges.length === 0) {
+          throw new Error('Failed to generate daily challenges');
+        }
+        
+        console.log('Displaying newly generated challenges...');
         await this.displayChallenges(chatId, newChallenges);
       } else {
         console.log('Displaying existing challenges...');
         await this.displayChallenges(chatId, challenges);
       }
-      console.log('showDailyChallenges completed successfully');
+      
+      console.log('=== DailyChallengeSystem.showDailyChallenges END ===');
     } catch (error) {
       console.error('Error showing daily challenges:', error);
       console.error('Error stack:', error.stack);
-      await sendMessage(chatId, '❌ Ошибка загрузки ежедневных заданий', this.env);
+      console.error('Error name:', error.name);
+      console.error('Error message:', error.message);
+      
+      // Отправляем более информативное сообщение об ошибке
+      const errorMessage = `❌ Ошибка загрузки ежедневных заданий
+
+🔍 Детали ошибки:
+• Тип: ${error.name}
+• Сообщение: ${error.message}
+
+Попробуйте позже или обратитесь к администратору.`;
+      
+      await sendMessage(chatId, errorMessage, this.env);
     }
   }
 
   // Отображение списка заданий
   async displayChallenges(chatId, challenges) {
     try {
-      console.log('displayChallenges called with chatId:', chatId, 'challenges:', challenges);
+      console.log('=== displayChallenges START ===');
+      console.log('chatId:', chatId);
+      console.log('challenges count:', challenges.length);
+      console.log('challenges:', challenges);
+      
+      if (!challenges || challenges.length === 0) {
+        console.log('No challenges to display');
+        await sendMessage(chatId, '📅 У вас пока нет ежедневных заданий. Попробуйте позже!', this.env);
+        return;
+      }
       
       let message = `📅 *Ежедневные задания*\n\n`;
       
@@ -309,6 +406,8 @@ ${challenge.description}
       let completedCount = 0;
 
       for (const challenge of challenges) {
+        console.log('Processing challenge:', challenge);
+        
         const status = challenge.is_completed ? '✅' : '⏳';
         const progress = challenge.is_completed ? 
           `${challenge.target_value}/${challenge.target_value}` : 
@@ -341,16 +440,30 @@ ${challenge.description}
         ]
       };
 
-      console.log('About to send message with keyboard. Message length:', message.length);
-      console.log('Keyboard:', keyboard);
-      console.log('Env passed to sendMessageWithKeyboard:', this.env);
+      console.log('Message length:', message.length);
+      console.log('Keyboard:', JSON.stringify(keyboard, null, 2));
+      console.log('Env keys:', Object.keys(this.env));
       
+      console.log('Sending message with keyboard...');
       await sendMessageWithKeyboard(chatId, message, keyboard, this.env);
       console.log('Message sent successfully');
+      console.log('=== displayChallenges END ===');
     } catch (error) {
       console.error('Error in displayChallenges:', error);
       console.error('Error stack:', error.stack);
-      await sendMessage(chatId, '❌ Ошибка отображения заданий', this.env);
+      console.error('Error name:', error.name);
+      console.error('Error message:', error.message);
+      
+      // Отправляем более информативное сообщение об ошибке
+      const errorMessage = `❌ Ошибка отображения заданий
+
+🔍 Детали ошибки:
+• Тип: ${error.name}
+• Сообщение: ${error.message}
+
+Попробуйте позже или обратитесь к администратору.`;
+      
+      await sendMessage(chatId, errorMessage, this.env);
     }
   }
 
