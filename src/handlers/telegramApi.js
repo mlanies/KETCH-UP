@@ -15,6 +15,7 @@ export async function sendMessage(chatId, text, env) {
       })
     });
     const data = await response.json();
+    console.log('Telegram API response:', data);
     if (!data.ok) {
       console.log('sendMessage error:', data);
     }

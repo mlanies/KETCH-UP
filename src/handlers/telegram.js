@@ -163,6 +163,10 @@ export async function handleCallbackQuery(callbackQuery, env) {
     } else if (data.startsWith('learning_')) {
       // Обработка callback query для обучения
       await handleLearningCallback(data, chatId, messageId, env);
+    } else if (data === 'user_profile') {
+      // Обработка профиля пользователя
+      const { handleLearningCallback } = await import('./learning.js');
+      await handleLearningCallback(data, chatId, messageId, env);
     }
     
     // Отвечаем на callback query

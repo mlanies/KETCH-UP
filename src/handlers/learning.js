@@ -11,6 +11,9 @@ import {
   showDetailedAnalytics,
   exportUserData
 } from './learningAnalytics.js';
+import { DatabaseManager } from './database.js';
+import { AchievementSystem } from './achievements.js';
+import { DailyChallengeSystem } from './dailyChallenges.js';
 
 // Состояния обучения для каждого пользователя
 const learningStates = new Map();
@@ -39,6 +42,8 @@ class LearningState {
     this.learningProgress = new Map(); // прогресс по категориям
     this.difficulty = 'beginner'; // beginner, intermediate, advanced
     this.streak = 0; // серия правильных ответов
+    this.sessionId = null; // ID сессии в базе данных
+    this.startTime = Date.now(); // время начала сессии
   }
 }
 
@@ -172,6 +177,10 @@ export async function startLearning(chatId, env) {
   const state = new LearningState();
   learningStates.set(chatId, state);
   
+  // Инициализируем пользователя в базе данных
+  const database = new DatabaseManager(env);
+  await database.initUser(chatId);
+  
   const welcomeText = `🎓 *Добро пожаловать в систему обучения!*
 
 Здесь вы сможете:
@@ -179,6 +188,7 @@ export async function startLearning(chatId, env) {
 • 🧠 Пройти тесты с ИИ
 • 📈 Отслеживать прогресс
 • 🏆 Заработать достижения
+• 📅 Выполнять ежедневные задания
 
 Выберите режим обучения:`;
 
@@ -194,6 +204,10 @@ export async function startLearning(chatId, env) {
       ],
       [
         { text: '🏆 Достижения', callback_data: 'learning_achievements' },
+        { text: '📅 Задания', callback_data: 'daily_challenges' }
+      ],
+      [
+        { text: '👤 Профиль', callback_data: 'user_profile' },
         { text: '⚙️ Настройки', callback_data: 'learning_settings' }
       ],
       [
@@ -208,11 +222,19 @@ export async function startLearning(chatId, env) {
 // Быстрый тест
 export async function startQuickTest(chatId, env) {
   const state = learningStates.get(chatId) || new LearningState();
+  
+  // Создаем сессию в базе данных
+  const database = new DatabaseManager(env);
+  const sessionId = await database.createLearningSession(chatId, 'quick_test');
+  
   state.currentLesson = 'quick_test';
+  state.sessionId = sessionId;
   state.totalQuestions = 5;
   state.score = 0;
   state.correctAnswers = 0;
   state.incorrectAnswers = [];
+  state.streak = 0;
+  state.startTime = Date.now();
   learningStates.set(chatId, state);
   
   // Начинаем новую сессию обучения
@@ -226,13 +248,24 @@ export async function startCategoryLesson(chatId, env) {
   const wines = await getWineData(env);
   const categories = [...new Set(wines.map(w => w.category))];
   
+  // Создаем безопасные ID для категорий
+  const categoryMap = {};
+  categories.forEach((category, index) => {
+    categoryMap[`cat_${index}`] = category;
+  });
+  
   const keyboard = {
-    inline_keyboard: categories.map(category => ([
-      { text: category, callback_data: `learning_category_${category}` }
+    inline_keyboard: categories.map((category, index) => ([
+      { text: category, callback_data: `learning_category_cat_${index}` }
     ])).concat([
       [{ text: '🔙 Назад', callback_data: 'learning_start' }]
     ])
   };
+  
+  // Сохраняем маппинг категорий в состоянии
+  const state = learningStates.get(chatId) || new LearningState();
+  state.categoryMap = categoryMap;
+  learningStates.set(chatId, state);
   
   await sendMessageWithKeyboard(chatId, 'Выберите категорию для изучения:', keyboard, env);
 }
@@ -240,11 +273,19 @@ export async function startCategoryLesson(chatId, env) {
 // ИИ-режим обучения
 export async function startAIMode(chatId, env) {
   const state = learningStates.get(chatId) || new LearningState();
+  
+  // Создаем сессию в базе данных
+  const database = new DatabaseManager(env);
+  const sessionId = await database.createLearningSession(chatId, 'ai_mode');
+  
   state.currentLesson = 'ai_mode';
+  state.sessionId = sessionId;
   state.totalQuestions = 10;
   state.score = 0;
   state.correctAnswers = 0;
   state.incorrectAnswers = [];
+  state.streak = 0;
+  state.startTime = Date.now();
   learningStates.set(chatId, state);
   
   // Начинаем новую сессию обучения
@@ -273,17 +314,19 @@ async function sendNextQuestion(chatId, env) {
 
 ${question.question}
 
-Варианты ответов:`;
+*Варианты ответов:*
+А. ${question.options.A}
+Б. ${question.options.B}
+В. ${question.options.C}
+Г. ${question.options.D}`;
 
   const keyboard = {
     inline_keyboard: [
       [
-        { text: `A) ${question.options.A}`, callback_data: `learning_answer_A` },
-        { text: `B) ${question.options.B}`, callback_data: `learning_answer_B` }
-      ],
-      [
-        { text: `C) ${question.options.C}`, callback_data: `learning_answer_C` },
-        { text: `D) ${question.options.D}`, callback_data: `learning_answer_D` }
+        { text: 'А', callback_data: `learning_answer_A` },
+        { text: 'Б', callback_data: `learning_answer_B` },
+        { text: 'В', callback_data: `learning_answer_C` },
+        { text: 'Г', callback_data: `learning_answer_D` }
       ],
       [
         { text: '🔙 Завершить тест', callback_data: 'learning_finish' }
@@ -315,17 +358,19 @@ async function sendNextAIQuestion(chatId, env) {
 
 ${question.question}
 
-Варианты ответов:`;
+*Варианты ответов:*
+А. ${question.options.A}
+Б. ${question.options.B}
+В. ${question.options.C}
+Г. ${question.options.D}`;
 
   const keyboard = {
     inline_keyboard: [
       [
-        { text: `A) ${question.options.A}`, callback_data: `learning_answer_A` },
-        { text: `B) ${question.options.B}`, callback_data: `learning_answer_B` }
-      ],
-      [
-        { text: `C) ${question.options.C}`, callback_data: `learning_answer_C` },
-        { text: `D) ${question.options.D}`, callback_data: `learning_answer_D` }
+        { text: 'А', callback_data: `learning_answer_A` },
+        { text: 'Б', callback_data: `learning_answer_B` },
+        { text: 'В', callback_data: `learning_answer_C` },
+        { text: 'Г', callback_data: `learning_answer_D` }
       ],
       [
         { text: '🔙 Завершить тест', callback_data: 'learning_finish' }
@@ -343,25 +388,60 @@ export async function handleLearningAnswer(chatId, answer, env) {
     await sendMessage(chatId, 'Ошибка: вопрос не найден. Начните обучение заново.', env);
     return;
   }
+
+  // Инициализируем системы
+  const database = new DatabaseManager(env);
+  const achievements = new AchievementSystem(database, env);
+  const dailyChallenges = new DailyChallengeSystem(database, env);
+
+  // Инициализируем пользователя в базе данных
+  await database.initUser(chatId);
   
   const isCorrect = answer === state.currentQuestion.correctAnswer;
+  const responseTime = Date.now() - state.startTime;
   state.totalQuestions++;
+  
+  // Сохраняем ответ в базу данных
+  if (state.sessionId) {
+    const wineCategory = state.currentQuestion.wineName ? 
+      (await getWineData(env)).find(w => w.id === state.currentQuestion.wineId)?.category : 'Общее';
+    
+    await database.saveAnswer(chatId, state.sessionId, {
+      questionText: state.currentQuestion.question,
+      userAnswer: answer,
+      correctAnswer: state.currentQuestion.correctAnswer,
+      isCorrect,
+      category: wineCategory,
+      questionType: state.currentQuestion.questionType || 'general',
+      wineId: state.currentQuestion.wineId,
+      responseTimeMs: responseTime
+    });
+  }
   
   if (isCorrect) {
     state.correctAnswers++;
-    state.score += 10;
     state.streak++;
     
-    let message = `✅ *Правильно!* +10 баллов\n\n`;
+    // Рассчитываем награды
+    const context = {
+      isWeekend: [0, 6].includes(new Date().getDay()),
+      isFirstSession: true, // TODO: проверить первую сессию дня
+      consecutiveDays: 1 // TODO: получить из базы данных
+    };
+    
+    const rewards = achievements.calculateAnswerRewards(true, state.streak, context);
+    state.score += rewards.points;
+    
+    let message = `✅ *Правильно!* +${rewards.points} баллов\n\n`;
     message += `🎯 Серия правильных ответов: ${state.streak}\n`;
-    message += `📊 Общий счет: ${state.score} баллов\n\n`;
+    message += `📊 Общий счет: ${state.score} баллов\n`;
+    message += `💎 +${rewards.experience} XP\n\n`;
     message += `💡 *Объяснение:*\n${state.currentQuestion.explanation}`;
     
     // Бонусы за серию
     if (state.streak >= 3) {
-      const bonus = Math.floor(state.streak / 3) * 5;
-      state.score += bonus;
-      message += `\n\n🔥 *Бонус за серию:* +${bonus} баллов!`;
+      const streakBonus = Math.min(state.streak * 2, 20);
+      message += `\n\n🔥 *Бонус за серию:* +${streakBonus} баллов!`;
     }
     
     // Добавляем кнопки для продолжения
@@ -384,9 +464,13 @@ export async function handleLearningAnswer(chatId, answer, env) {
       wineName: state.currentQuestion.wineName
     });
     
+    const rewards = achievements.calculateAnswerRewards(false, 0);
+    state.score += rewards.points;
+    
     let message = `❌ *Неправильно!*\n\n`;
     message += `Правильный ответ: ${state.currentQuestion.correctAnswer})\n`;
-    message += `📊 Общий счет: ${state.score} баллов\n\n`;
+    message += `📊 Общий счет: ${state.score} баллов\n`;
+    message += `💎 +${rewards.experience} XP\n\n`;
     message += `💡 *Объяснение:*\n${state.currentQuestion.explanation}`;
     
     // Добавляем кнопки для продолжения
@@ -416,37 +500,104 @@ export async function handleLearningAnswer(chatId, answer, env) {
   // Обновляем аналитику
   const questionType = state.currentQuestion.questionType || 'general';
   updateAnalytics(chatId, wineCategory, questionType, isCorrect);
+  
+  // Проверяем ежедневные задания
+  await dailyChallenges.checkAndUpdateProgress(chatId, 'answer_question', 1);
+  
+  // Обновляем время для следующего вопроса
+  state.startTime = Date.now();
 }
 
 // Завершение урока
 async function finishLesson(chatId, env) {
   const state = learningStates.get(chatId);
   if (!state) return;
+
+  // Инициализируем системы
+  const database = new DatabaseManager(env);
+  const achievements = new AchievementSystem(database, env);
+  const dailyChallenges = new DailyChallengeSystem(database, env);
   
   const accuracy = Math.round((state.correctAnswers / state.totalQuestions) * 100);
   const grade = getGrade(accuracy);
+  
+  // Завершаем сессию в базе данных
+  if (state.sessionId) {
+    const sessionStats = {
+      totalQuestions: state.totalQuestions,
+      correctAnswers: state.correctAnswers,
+      score: state.score,
+      experienceGained: Math.round(state.score * 0.5) // Примерный расчет опыта
+    };
+    
+    await database.finishLearningSession(state.sessionId, sessionStats);
+  }
+  
+  // Обновляем статистику пользователя
+  const userStats = {
+    totalScore: state.score,
+    totalQuestions: state.totalQuestions,
+    totalCorrect: state.correctAnswers,
+    learningStreak: state.streak,
+    maxStreak: state.streak, // TODO: получить из базы данных
+    experiencePoints: Math.round(state.score * 0.5)
+  };
+  
+  await database.updateUserStats(chatId, userStats);
+  
+  // Проверяем достижения
+  const stats = {
+    totalQuestions: state.totalQuestions,
+    totalScore: state.score,
+    maxStreak: state.streak,
+    aiQuestions: state.currentLesson === 'ai_mode' ? state.totalQuestions : 0,
+    categoriesStudied: state.learningProgress.size
+  };
+  
+  const newAchievements = await achievements.checkAchievements(chatId, stats);
+  
+  // Проверяем повышение уровня
+  const user = await database.getUser(chatId);
+  if (user) {
+    const oldExperience = user.experience_points - userStats.experiencePoints;
+    const newExperience = user.experience_points;
+    await achievements.checkLevelUp(chatId, oldExperience, newExperience);
+  }
+  
+  // Проверяем ежедневные задания
+  if (accuracy >= 80 && state.totalQuestions >= 5) {
+    await dailyChallenges.checkAndUpdateProgress(chatId, 'test_completed', accuracy);
+  }
   
   let message = `🎓 *Урок завершен!*\n\n`;
   message += `📊 *Результаты:*\n`;
   message += `✅ Правильных ответов: ${state.correctAnswers}/${state.totalQuestions}\n`;
   message += `📈 Точность: ${accuracy}%\n`;
   message += `🏆 Оценка: ${grade}\n`;
-  message += `💎 Общий счет: ${state.score} баллов\n\n`;
+  message += `💎 Общий счет: ${state.score} баллов\n`;
+  message += `💎 Опыт: +${userStats.experiencePoints} XP\n\n`;
+  
+  // Бонус за идеальный тест
+  if (accuracy === 100 && state.totalQuestions >= 5) {
+    const perfectRewards = achievements.calculatePerfectTestRewards(state.totalQuestions);
+    message += `✨ *Идеальный тест!* +${perfectRewards.points} бонусных баллов\n\n`;
+  }
   
   if (state.incorrectAnswers.length > 0) {
     message += `📝 *Рекомендации для изучения:*\n`;
     state.incorrectAnswers.slice(0, 3).forEach((item, index) => {
       message += `${index + 1}. ${item.wineName} - повторите характеристики\n`;
     });
+    message += '\n';
   }
   
-  // Проверяем достижения
-  const achievements = checkAchievements(state);
-  if (achievements.length > 0) {
-    message += `\n🏆 *Новые достижения:*\n`;
-    achievements.forEach(achievement => {
-      message += `• ${achievement}\n`;
+  // Показываем новые достижения
+  if (newAchievements.length > 0) {
+    message += `🏆 *Новые достижения:*\n`;
+    newAchievements.forEach(achievement => {
+      message += `• ${achievement.icon} ${achievement.name}\n`;
     });
+    message += '\n';
   }
   
   const keyboard = {
@@ -470,9 +621,19 @@ async function finishLesson(chatId, env) {
   
   await sendMessageWithKeyboard(chatId, message, keyboard, env);
   
+  // Логируем завершение сессии
+  await database.logActivity(
+    chatId,
+    'session_completed',
+    `Завершена сессия: ${state.currentLesson || 'обучение'}`,
+    state.score,
+    userStats.experiencePoints
+  );
+  
   // Сбрасываем состояние
   state.currentLesson = null;
   state.currentQuestion = null;
+  state.sessionId = null;
 }
 
 // Получение оценки
@@ -560,7 +721,9 @@ export async function handleLearningCallback(data, chatId, messageId, env) {
       const answer = data.replace('learning_answer_', '');
       await handleLearningAnswer(chatId, answer, env);
     } else if (data.startsWith('learning_category_')) {
-      const category = data.replace('learning_category_', '');
+      const categoryId = data.replace('learning_category_', '');
+      const state = learningStates.get(chatId);
+      const category = state?.categoryMap?.[categoryId] || categoryId;
       await startCategorySpecificLesson(chatId, category, env);
     } else if (data === 'learning_detailed_analytics') {
       await showDetailedAnalytics(chatId, env);
@@ -570,6 +733,29 @@ export async function handleLearningCallback(data, chatId, messageId, env) {
       await exportLearningData(chatId, env);
     } else if (data === 'learning_next_question') {
       await sendNextQuestionBasedOnLesson(chatId, env);
+    } else if (data === 'user_profile') {
+      await showUserProfile(chatId, env);
+    } else if (data === 'daily_challenges') {
+      try {
+        console.log('Handling daily_challenges callback - START');
+        console.log('chatId:', chatId);
+        console.log('env keys:', Object.keys(env));
+        console.log('About to call showDailyChallenges...');
+        await showDailyChallenges(chatId, env);
+        console.log('Handling daily_challenges callback - END');
+      } catch (error) {
+        console.error('Error in daily_challenges handler:', error);
+        console.error('Error stack:', error.stack);
+        await sendMessage(chatId, '❌ Ошибка загрузки ежедневных заданий', env);
+      }
+    } else if (data === 'daily_challenges_refresh') {
+      await showDailyChallenges(chatId, env);
+    } else if (data === 'daily_challenges_stats') {
+      await showChallengeStats(chatId, env);
+    } else if (data === 'achievements_history') {
+      await showAchievementsHistory(chatId, env);
+    } else if (data === 'detailed_stats') {
+      await showDetailedStats(chatId, env);
     }
   } catch (error) {
     console.error('Learning callback error:', error);
@@ -579,32 +765,151 @@ export async function handleLearningCallback(data, chatId, messageId, env) {
 
 // Показать достижения
 async function showAchievements(chatId, env) {
-  const state = learningStates.get(chatId);
-  const achievements = [
-    { name: '🎯 Первые шаги', description: '10 правильных ответов', unlocked: state?.correctAnswers >= 10 },
-    { name: '🔥 Серия побед', description: '5 правильных ответов подряд', unlocked: state?.streak >= 5 },
-    { name: '💎 Стобалльник', description: '100 баллов', unlocked: state?.score >= 100 },
-    { name: '🧠 ИИ-мастер', description: 'Пройдите 10 ИИ-вопросов', unlocked: false },
-    { name: '📚 Категорийный эксперт', description: 'Изучите все категории', unlocked: false },
-    { name: '🏆 Чемпион', description: '1000 баллов', unlocked: state?.score >= 1000 }
-  ];
+  const database = new DatabaseManager(env);
+  const achievements = new AchievementSystem(database, env);
   
-  let message = `🏆 *Достижения*\n\n`;
-  achievements.forEach(achievement => {
-    const status = achievement.unlocked ? '✅' : '🔒';
-    message += `${status} ${achievement.name}\n`;
-    message += `   ${achievement.description}\n\n`;
-  });
+  await achievements.showAchievements(chatId);
+}
+
+// Показать профиль пользователя
+async function showUserProfile(chatId, env) {
+  const database = new DatabaseManager(env);
+  const achievements = new AchievementSystem(database, env);
   
-  const keyboard = {
-    inline_keyboard: [
-      [
-        { text: '🔙 Назад', callback_data: 'learning_start' }
+  await achievements.showUserProfile(chatId);
+}
+
+// Показать ежедневные задания
+async function showDailyChallenges(chatId, env) {
+  console.log('=== showDailyChallenges FUNCTION ENTRY ===');
+  console.log('Function called with chatId:', chatId);
+  console.log('Function called with env:', env);
+  
+  try {
+    console.log('showDailyChallenges called with chatId:', chatId);
+    const database = new DatabaseManager(env);
+    console.log('Database manager created');
+    const dailyChallenges = new DailyChallengeSystem(database, env);
+    console.log('DailyChallengeSystem created');
+    
+    await dailyChallenges.showDailyChallenges(chatId);
+    console.log('showDailyChallenges completed successfully');
+  } catch (error) {
+    console.error('Error in showDailyChallenges function:', error);
+    console.error('Error stack:', error.stack);
+    await sendMessage(chatId, '❌ Ошибка загрузки ежедневных заданий', env);
+  }
+}
+
+// Показать статистику заданий
+async function showChallengeStats(chatId, env) {
+  const database = new DatabaseManager(env);
+  const dailyChallenges = new DailyChallengeSystem(database, env);
+  
+  await dailyChallenges.showChallengeStats(chatId);
+}
+
+// Показать историю достижений
+async function showAchievementsHistory(chatId, env) {
+  const database = new DatabaseManager(env);
+  
+  try {
+    const achievements = await database.getAchievements(chatId);
+    
+    if (achievements.length === 0) {
+      await sendMessage(chatId, '🏆 У вас пока нет достижений. Продолжайте обучение, чтобы их получить!');
+      return;
+    }
+    
+    let message = `🏆 *История достижений*\n\n`;
+    
+    achievements.forEach((achievement, index) => {
+      const date = new Date(achievement.unlocked_at).toLocaleDateString('ru-RU');
+      message += `${achievement.icon} **${achievement.achievement_name}**\n`;
+      message += `└ ${achievement.description}\n`;
+      message += `└ 📅 ${date}\n`;
+      message += `└ 💎 +${achievement.points} XP\n\n`;
+    });
+    
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: '🔙 Назад', callback_data: 'learning_start' }
+        ]
       ]
-    ]
-  };
+    };
+    
+    await sendMessageWithKeyboard(chatId, message, keyboard, env);
+  } catch (error) {
+    console.error('Error showing achievements history:', error);
+    await sendMessage(chatId, '❌ Ошибка загрузки истории достижений');
+  }
+}
+
+// Показать детальную статистику
+async function showDetailedStats(chatId, env) {
+  const database = new DatabaseManager(env);
   
-  await sendMessageWithKeyboard(chatId, message, keyboard, env);
+  try {
+    const stats = await database.getUserStats(chatId);
+    
+    if (!stats) {
+      await sendMessage(chatId, '❌ Ошибка загрузки статистики');
+      return;
+    }
+    
+    const { user, categoryStats, questionTypeStats, recentSessions } = stats;
+    const accuracy = user.total_questions > 0 ? 
+      Math.round((user.total_correct / user.total_questions) * 100) : 0;
+    
+    let message = `📊 *Детальная статистика*\n\n`;
+    
+    // Общая статистика
+    message += `🎯 *Общая статистика:*\n`;
+    message += `• Всего вопросов: ${user.total_questions}\n`;
+    message += `• Правильных ответов: ${user.total_correct}\n`;
+    message += `• Точность: ${accuracy}%\n`;
+    message += `• Общий счет: ${user.total_score} баллов\n`;
+    message += `• Очки опыта: ${user.experience_points} XP\n\n`;
+    
+    // Статистика по категориям
+    if (categoryStats.length > 0) {
+      message += `📚 *По категориям:*\n`;
+      categoryStats.slice(0, 5).forEach(stat => {
+        const emoji = stat.accuracy > 80 ? '🟢' : stat.accuracy > 60 ? '🟡' : '🔴';
+        message += `${emoji} ${stat.category}: ${stat.correct_answers}/${stat.total_questions} (${stat.accuracy}%)\n`;
+      });
+      message += '\n';
+    }
+    
+    // Последние сессии
+    if (recentSessions.length > 0) {
+      message += `📈 *Последние сессии:*\n`;
+      recentSessions.slice(0, 3).forEach(session => {
+        const date = new Date(session.start_time).toLocaleDateString('ru-RU');
+        const sessionAccuracy = session.total_questions > 0 ? 
+          Math.round((session.correct_answers / session.total_questions) * 100) : 0;
+        message += `• ${date}: ${session.correct_answers}/${session.total_questions} (${sessionAccuracy}%) - ${session.score} баллов\n`;
+      });
+    }
+    
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: '📊 Экспорт данных', callback_data: 'learning_export_data' },
+          { text: '🏆 Достижения', callback_data: 'achievements_history' }
+        ],
+        [
+          { text: '🔙 Назад', callback_data: 'learning_start' }
+        ]
+      ]
+    };
+    
+    await sendMessageWithKeyboard(chatId, message, keyboard, env);
+  } catch (error) {
+    console.error('Error showing detailed stats:', error);
+    await sendMessage(chatId, '❌ Ошибка загрузки детальной статистики');
+  }
 }
 
 // Показать настройки обучения
@@ -684,17 +989,19 @@ async function sendNextCategoryQuestion(chatId, env) {
 
 ${question.question}
 
-Варианты ответов:`;
+*Варианты ответов:*
+А. ${question.options.A}
+Б. ${question.options.B}
+В. ${question.options.C}
+Г. ${question.options.D}`;
 
   const keyboard = {
     inline_keyboard: [
       [
-        { text: `A) ${question.options.A}`, callback_data: `learning_answer_A` },
-        { text: `B) ${question.options.B}`, callback_data: `learning_answer_B` }
-      ],
-      [
-        { text: `C) ${question.options.C}`, callback_data: `learning_answer_C` },
-        { text: `D) ${question.options.D}`, callback_data: `learning_answer_D` }
+        { text: 'А', callback_data: `learning_answer_A` },
+        { text: 'Б', callback_data: `learning_answer_B` },
+        { text: 'В', callback_data: `learning_answer_C` },
+        { text: 'Г', callback_data: `learning_answer_D` }
       ],
       [
         { text: '🔙 Завершить тест', callback_data: 'learning_finish' }
@@ -748,17 +1055,19 @@ ${question.question}
 *Категория:* ${question.category}
 *Сложность:* ${question.difficulty}
 
-Варианты ответов:`;
+*Варианты ответов:*
+А. ${question.options.A}
+Б. ${question.options.B}
+В. ${question.options.C}
+Г. ${question.options.D}`;
 
   const keyboard = {
     inline_keyboard: [
       [
-        { text: `A) ${question.options.A}`, callback_data: `learning_answer_A` },
-        { text: `B) ${question.options.B}`, callback_data: `learning_answer_B` }
-      ],
-      [
-        { text: `C) ${question.options.C}`, callback_data: `learning_answer_C` },
-        { text: `D) ${question.options.D}`, callback_data: `learning_answer_D` }
+        { text: 'А', callback_data: `learning_answer_A` },
+        { text: 'Б', callback_data: `learning_answer_B` },
+        { text: 'В', callback_data: `learning_answer_C` },
+        { text: 'Г', callback_data: `learning_answer_D` }
       ],
       [
         { text: '🔙 Завершить тест', callback_data: 'learning_finish' }
@@ -771,32 +1080,59 @@ ${question.question}
 
 // Экспорт данных обучения
 async function exportLearningData(chatId, env) {
-  const exportData = exportUserData(chatId);
+  const database = new DatabaseManager(env);
   
-  const message = `📊 *Экспорт данных обучения*
+  try {
+    const exportData = await database.exportUserData(chatId);
+    
+    if (!exportData) {
+      await sendMessage(chatId, '❌ Ошибка экспорта данных');
+      return;
+    }
+    
+    const { user, achievements, activityHistory, stats } = exportData;
+    const accuracy = user.total_questions > 0 ? 
+      Math.round((user.total_correct / user.total_questions) * 100) : 0;
+    
+    const message = `📊 *Экспорт данных обучения*
 
-Ваши данные готовы для экспорта. Скопируйте JSON ниже:
+✅ Данные успешно экспортированы
+📅 Дата: ${new Date().toLocaleDateString('ru-RU')}
 
-\`\`\`json
-${exportData}
-\`\`\`
+👤 *Профиль пользователя:*
+• Имя: ${user.first_name || 'Не указано'}
+• Всего вопросов: ${user.total_questions}
+• Правильных ответов: ${user.total_correct}
+• Точность: ${accuracy}%
+• Общий счет: ${user.total_score} баллов
+• Очки опыта: ${user.experience_points} XP
+• Достижений: ${achievements.length}
+• Активностей: ${activityHistory.length}
 
-💡 *Что включено:*
-• Общая статистика обучения
-• Производительность по категориям
-• Производительность по типам вопросов
-• Сильные и слабые стороны
-• Рекомендации для улучшения`;
+📈 *Статистика:*
+• Категорий изучено: ${stats.categoryStats?.length || 0}
+• Типов вопросов: ${stats.questionTypeStats?.length || 0}
+• Сессий обучения: ${stats.recentSessions?.length || 0}
 
-  const keyboard = {
-    inline_keyboard: [
-      [
-        { text: '🔙 Назад', callback_data: 'learning_detailed_analytics' }
+Данные сохранены в формате JSON и готовы для анализа.`;
+    
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: '📊 Детальная статистика', callback_data: 'detailed_stats' },
+          { text: '🏆 Достижения', callback_data: 'achievements_history' }
+        ],
+        [
+          { text: '🔙 Назад', callback_data: 'learning_start' }
+        ]
       ]
-    ]
-  };
-  
-  await sendMessageWithKeyboard(chatId, message, keyboard, env);
+    };
+    
+    await sendMessageWithKeyboard(chatId, message, keyboard, env);
+  } catch (error) {
+    console.error('Error exporting learning data:', error);
+    await sendMessage(chatId, '❌ Ошибка экспорта данных');
+  }
 } 
 
 // Отправка следующего вопроса в зависимости от типа урока

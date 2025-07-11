@@ -154,6 +154,23 @@ export default {
       return testCocktailsIds(env);
     }
 
+    // API эндпоинты для системы обучения
+    if (url.pathname === '/user-stats' && request.method === 'GET') {
+      return getUserStats(request, env);
+    }
+
+    if (url.pathname === '/user-achievements' && request.method === 'GET') {
+      return getUserAchievements(request, env);
+    }
+
+    if (url.pathname === '/daily-challenges' && request.method === 'GET') {
+      return getDailyChallenges(request, env);
+    }
+
+    if (url.pathname === '/export-data' && request.method === 'POST') {
+      return exportUserData(request, env);
+    }
+
     return new Response('Telegram Wine Bot is running!', {
       headers: { 'Content-Type': 'text/plain' },
     });
@@ -187,6 +204,176 @@ async function testAIWithWine(request, env) {
     });
   } catch (error) {
     console.error('AI with wine test error:', error);
+    return new Response(JSON.stringify({
+      error: error.message
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+// API эндпоинты для системы обучения
+
+// Получение статистики пользователя
+async function getUserStats(request, env) {
+  try {
+    const url = new URL(request.url);
+    const chatId = url.searchParams.get('chatId');
+    
+    if (!chatId) {
+      return new Response(JSON.stringify({
+        error: 'chatId parameter is required'
+      }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    const { DatabaseManager } = await import('./handlers/database.js');
+    const database = new DatabaseManager(env);
+    
+    const stats = await database.getUserStats(parseInt(chatId));
+    
+    if (!stats) {
+      return new Response(JSON.stringify({
+        error: 'User not found'
+      }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    return new Response(JSON.stringify({
+      success: true,
+      data: stats
+    }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('Error getting user stats:', error);
+    return new Response(JSON.stringify({
+      error: error.message
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+// Получение достижений пользователя
+async function getUserAchievements(request, env) {
+  try {
+    const url = new URL(request.url);
+    const chatId = url.searchParams.get('chatId');
+    
+    if (!chatId) {
+      return new Response(JSON.stringify({
+        error: 'chatId parameter is required'
+      }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    const { DatabaseManager } = await import('./handlers/database.js');
+    const database = new DatabaseManager(env);
+    
+    const achievements = await database.getAchievements(parseInt(chatId));
+    
+    return new Response(JSON.stringify({
+      success: true,
+      data: achievements
+    }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('Error getting user achievements:', error);
+    return new Response(JSON.stringify({
+      error: error.message
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+// Получение ежедневных заданий
+async function getDailyChallenges(request, env) {
+  try {
+    const url = new URL(request.url);
+    const chatId = url.searchParams.get('chatId');
+    
+    if (!chatId) {
+      return new Response(JSON.stringify({
+        error: 'chatId parameter is required'
+      }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    const { DailyChallengeSystem } = await import('./handlers/dailyChallenges.js');
+    const { DatabaseManager } = await import('./handlers/database.js');
+    
+    const database = new DatabaseManager(env);
+    const dailyChallenges = new DailyChallengeSystem(database);
+    
+    const challenges = await dailyChallenges.getActiveChallenges(parseInt(chatId));
+    
+    return new Response(JSON.stringify({
+      success: true,
+      data: challenges
+    }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('Error getting daily challenges:', error);
+    return new Response(JSON.stringify({
+      error: error.message
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+// Экспорт данных пользователя
+async function exportUserData(request, env) {
+  try {
+    const { chatId } = await request.json();
+    
+    if (!chatId) {
+      return new Response(JSON.stringify({
+        error: 'chatId is required'
+      }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    const { DatabaseManager } = await import('./handlers/database.js');
+    const database = new DatabaseManager(env);
+    
+    const exportData = await database.exportUserData(parseInt(chatId));
+    
+    if (!exportData) {
+      return new Response(JSON.stringify({
+        error: 'User not found'
+      }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    return new Response(JSON.stringify({
+      success: true,
+      data: exportData
+    }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('Error exporting user data:', error);
     return new Response(JSON.stringify({
       error: error.message
     }), {

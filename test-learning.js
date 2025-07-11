@@ -5,10 +5,11 @@ import { generatePersonalizedReport, updateAnalytics, startLearningSession } fro
 
 // Мок окружения для тестирования
 const mockEnv = {
-  CLOUDFLARE_ACCOUNT_ID: 'test_account_id',
-  CLOUDFLARE_AI_TOKEN: 'test_ai_token',
-  GOOGLE_SHEETS_API_KEY: 'test_api_key',
-  GOOGLE_SHEETS_SPREADSHEET_ID: 'test_spreadsheet_id'
+  CLOUDFLARE_ACCOUNT_ID: 'mock_account_id_for_testing',
+  CLOUDFLARE_AI_TOKEN: 'mock_ai_token_for_testing',
+  GOOGLE_SHEETS_API_KEY: 'mock_api_key_for_testing',
+  GOOGLE_SHEETS_SPREADSHEET_ID: 'mock_spreadsheet_id_for_testing',
+  DB: null // Мок базы данных для тестов
 };
 
 // Мок функции отправки сообщений

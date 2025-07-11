@@ -1,0 +1,69 @@
+# Зависимости
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Переменные окружения
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Секреты и токены
+*.key
+*.pem
+*.p12
+*.pfx
+secrets.json
+tokens.json
+
+# Логи
+logs
+*.log
+
+# Временные файлы
+.tmp/
+.temp/
+*.tmp
+*.temp
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Cloudflare
+.wrangler/
+dist/
+
+# Тестовые файлы с чувствительными данными
+test-*.js
+*.test.js
+*.spec.js
+
+# Резервные копии
+*.backup
+*.bak
+*.old
+
+# База данных
+*.db
+*.sqlite
+*.sqlite3
+
+# Локальные конфигурации
+wrangler.toml.local
+config.local.js 
