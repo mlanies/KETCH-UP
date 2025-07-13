@@ -1,601 +1,208 @@
-// Telegram Wine Bot for Cloudflare Workers
-// Бот для обучения официантов по ассортименту вин
+// Основной воркер для Telegram Wine Bot
+// Обрабатывает webhook от Telegram и API запросы
 
-import {
-  handleWebhook,
-  handleMessage,
-  handleCallbackQuery,
-  sendWelcomeMessage,
-  sendMainMenu,
-  handleSectionSelection,
-  handleSearchByName,
-  showAllWines,
-  searchWineByName,
-  showWineDetails,
-  sendHelpMessage,
-  handleRefreshData
-} from './handlers/telegram.js';
-import {
-  startLearning,
-  handleLearningCallback
-} from './handlers/learning.js';
-import {
-  handleMenuSection
-} from './handlers/menu.js';
-import {
-  handleAlcoholSection,
-  handleCategorySelection,
-  handleShowCategory
-} from './handlers/alcohol.js';
-import {
-  getWineData,
-  getSelectedSheetId,
-  getSheetNameById,
-  loadWinesFromGoogleSheets,
-  refreshWineData,
-  getWineNames,
-  getAllWineData,
-  getCurrentSheet
-} from './handlers/data.js';
-import {
-  sendMessage,
-  sendMessageWithKeyboard,
-  editMessage,
-  sendPhotoWithCaption,
-  answerCallbackQuery
-} from './handlers/telegramApi.js';
-import {
-  askCloudflareAI,
-  askCloudflareAIWithWineContext,
-  testAI
-} from './handlers/ai.js';
-import {
-  applySecurityChecks,
-  getSecurityStats,
-  cleanupSecurityCache
-} from './handlers/security.js';
-import {
-  setWebhook,
-  deleteWebhook,
-  getBotStatus,
-  getWebhookInfo
-} from './handlers/webhook.js';
-import {
-  handleFilterSelection,
-  handleFilterValueSelection,
-  testFilters
-} from './handlers/filters.js';
-
-// Значение sheetId по умолчанию ("Вина")
-const DEFAULT_SHEET_ID = 304728120;
+import { handleWebhook } from './handlers/telegram.js';
+import { setWebhook, deleteWebhook, getBotStatus, getWebhookInfo } from './handlers/webhook.js';
+import { jsonResponse, withCorsHeaders } from './utils/cors.js';
 
 export default {
   async fetch(request, env, ctx) {
-    // Обработка CORS для веб-хуков
+    const url = new URL(request.url);
+    console.log('[BACKEND] Request:', request.method, url.pathname);
+    
+    // Обработка CORS
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         headers: {
           'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type',
         },
       });
     }
-
-    const url = new URL(request.url);
     
-    // Применяем проверки безопасности (кроме OPTIONS и Telegram webhook)
-    if (url.pathname !== '/webhook') {
-      const securityCheck = await applySecurityChecks(request, env);
-      if (!securityCheck.allowed) {
-        return securityCheck.response;
+    try {
+      // Webhook от Telegram
+      if (url.pathname === '/webhook' && request.method === 'POST') {
+        console.log('[BACKEND] Processing Telegram webhook');
+        return await handleWebhook(request, env);
       }
+      
+      // API эндпоинты
+      if (url.pathname === '/user-stats' && request.method === 'GET') {
+        return withCorsHeaders(await getUserStats(request, env));
+      }
+      
+      if (url.pathname === '/user-achievements' && request.method === 'GET') {
+        return withCorsHeaders(await getUserStats(request, env));
+      }
+      
+      if (url.pathname === '/daily-challenges' && request.method === 'GET') {
+        return withCorsHeaders(await getDailyChallenges(request, env));
+      }
+      
+      // Управление webhook
+      if (url.pathname === '/set-webhook' && request.method === 'POST') {
+        return withCorsHeaders(await setWebhook(env));
+      }
+      
+      if (url.pathname === '/delete-webhook' && request.method === 'POST') {
+        return withCorsHeaders(await deleteWebhook(env));
+      }
+      
+      if (url.pathname === '/bot-status' && request.method === 'GET') {
+        return withCorsHeaders(await getBotStatus(env));
+      }
+      
+      if (url.pathname === '/webhook-info' && request.method === 'GET') {
+        return withCorsHeaders(await getWebhookInfo(env));
+      }
+      
+      // Тестовый эндпоинт для проверки работы
+      if (url.pathname === '/health' && request.method === 'GET') {
+        return jsonResponse({ 
+          status: 'ok', 
+          timestamp: new Date().toISOString(),
+          worker: 'telegram-wine-bot-backend'
+        });
+      }
+      
+      // Тестовый эндпоинт для проверки базы данных
+      if (url.pathname === '/test-db' && request.method === 'GET') {
+        try {
+          const { DatabaseManager } = await import('./handlers/database.js');
+          const db = new DatabaseManager(env.DB);
+          
+          // Простой тест подключения
+          const result = await db.query('SELECT 1 as test');
+          return jsonResponse({ 
+            status: 'ok', 
+            db_test: result,
+            timestamp: new Date().toISOString()
+          });
+        } catch (error) {
+          console.error('[BACKEND] Database test error:', error);
+          return jsonResponse({ 
+            status: 'error', 
+            error: error.message,
+            timestamp: new Date().toISOString()
+          }, 500);
+        }
+      }
+      
+      // 404 для неизвестных путей
+      console.log('[BACKEND] 404 Not Found:', url.pathname);
+      return new Response('Not Found', { status: 404 });
+      
+    } catch (error) {
+      console.error('[BACKEND] Error processing request:', error);
+      return new Response('Internal Server Error', { status: 500 });
     }
-    
-    // Обработка веб-хука от Telegram
-    if (url.pathname === '/webhook' && request.method === 'POST') {
-      return handleWebhook(request, env);
-    }
-    
-    // Установка веб-хука
-    if (url.pathname === '/set-webhook' && request.method === 'GET') {
-      return setWebhook(env);
-    }
-    
-    // Удаление веб-хука
-    if (url.pathname === '/delete-webhook' && request.method === 'GET') {
-      return deleteWebhook(env);
-    }
-    
-    // Обновление данных из Google Sheets
-    if (url.pathname === '/refresh-data' && request.method === 'POST') {
-      return refreshWineData(env);
-    }
-    
-    // Статус бота
-    if (url.pathname === '/status' && request.method === 'GET') {
-      return getBotStatus(env);
-    }
-    
-    // Информация о webhook
-    if (url.pathname === '/webhook-info' && request.method === 'GET') {
-      return getWebhookInfo(env);
-    }
-    
-    // Тест Google Sheets API
-    if (url.pathname === '/test-sheets' && request.method === 'GET') {
-      return testGoogleSheets(env);
-    }
-    
-    // Тест документа с коктейлями
-    if (url.pathname === '/test-cocktails' && request.method === 'GET') {
-      return testCocktailSheets(env);
-    }
-    
-    // Тест ИИ
-    if (url.pathname === '/test-ai' && request.method === 'POST') {
-      return testAI(request, env);
-    }
-    
-    // Тест ИИ с контекстом конкретного напитка
-    if (url.pathname === '/test-ai-wine' && request.method === 'POST') {
-      return testAIWithWine(request, env);
-    }
-    
-    // Тест фильтров
-    if (url.pathname === '/test-filters' && request.method === 'GET') {
-      return testFilters(env);
-    }
-    
-    // Просмотр названий вин
-    if (url.pathname === '/wine-names' && request.method === 'GET') {
-      return getWineNames(env);
-    }
-    
-    // Просмотр всех данных из листа "Вина"
-    if (url.pathname === '/wine-data' && request.method === 'GET') {
-      return getAllWineData(env);
-    }
-
-    // Новый эндпоинт для просмотра выбранного листа
-    if (url.pathname === '/sheet' && request.method === 'GET') {
-      return getCurrentSheet(env);
-    }
-    
-    // Тестовый эндпоинт для проверки ID коктейлей
-    if (url.pathname === '/test-cocktails-ids' && request.method === 'GET') {
-      return testCocktailsIds(env);
-    }
-
-    // API эндпоинты для системы обучения
-    if (url.pathname === '/user-stats' && request.method === 'GET') {
-      return getUserStats(request, env);
-    }
-
-    if (url.pathname === '/user-achievements' && request.method === 'GET') {
-      return getUserAchievements(request, env);
-    }
-
-    if (url.pathname === '/daily-challenges' && request.method === 'GET') {
-      return getDailyChallenges(request, env);
-    }
-
-    if (url.pathname === '/export-data' && request.method === 'POST') {
-      return exportUserData(request, env);
-    }
-    
-    // Статистика безопасности
-    if (url.pathname === '/security-stats' && request.method === 'GET') {
-      return getSecurityStatsEndpoint(env);
-    }
-    
-    // Очистка кэша безопасности
-    if (url.pathname === '/cleanup-security' && request.method === 'POST') {
-      return cleanupSecurityEndpoint(env);
-    }
-
-    return new Response('Telegram Wine Bot is running!', {
-      headers: { 'Content-Type': 'text/plain' },
-    });
   },
 };
 
-// Тестирование ИИ с контекстом конкретного напитка
-async function testAIWithWine(request, env) {
-  try {
-    const { question, wineId } = await request.json();
-    
-    if (!question || !wineId) {
-      return new Response(JSON.stringify({
-        error: 'Question and wineId are required'
-      }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-    
-    console.log('Testing AI with wine context:', { question, wineId });
-    const answer = await askCloudflareAIWithWineContext(question, wineId, env);
-    
-    return new Response(JSON.stringify({
-      success: true,
-      question: question,
-      wineId: wineId,
-      answer: answer
-    }), {
-      headers: { 'Content-Type': 'application/json' }
-    });
-  } catch (error) {
-    console.error('AI with wine test error:', error);
-    return new Response(JSON.stringify({
-      error: error.message
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-}
-
-// API эндпоинты для системы обучения
-
 // Получение статистики пользователя
 async function getUserStats(request, env) {
+  console.log('[BACKEND] getUserStats START');
   try {
     const url = new URL(request.url);
     const chatId = url.searchParams.get('chatId');
-    
+    console.log('[BACKEND] getUserStats chatId:', chatId);
     if (!chatId) {
-      return new Response(JSON.stringify({
-        error: 'chatId parameter is required'
-      }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return jsonResponse({ error: 'chatId parameter is required' }, 400);
     }
     
+    console.log('[BACKEND] getUserStats Checking env.DB...');
+    if (!env.DB) {
+      console.error('[BACKEND] getUserStats env.DB is not available');
+      return jsonResponse({ error: 'Database not available' }, 500);
+    }
+    
+    console.log('[BACKEND] getUserStats Importing DatabaseManager...');
     const { DatabaseManager } = await import('./handlers/database.js');
-    const database = new DatabaseManager(env);
+    console.log('[BACKEND] getUserStats DatabaseManager imported successfully');
     
-    const stats = await database.getUserStats(parseInt(chatId));
+    console.log('[BACKEND] getUserStats Creating database instance...');
+    const database = new DatabaseManager(env.DB);
+    console.log('[BACKEND] getUserStats Database instance created');
     
-    if (!stats) {
-      return new Response(JSON.stringify({
-        error: 'User not found'
-      }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' }
-      });
+    console.log('[BACKEND] getUserStats Initializing user...');
+    const initResult = await database.initUser(parseInt(chatId));
+    console.log('[BACKEND] getUserStats User initialization result:', initResult);
+    
+    console.log('[BACKEND] getUserStats Getting user stats...');
+    let stats = await database.getUserStats(parseInt(chatId));
+    console.log('[BACKEND] getUserStats Raw stats:', stats);
+    
+    if (!stats || !stats.user) {
+      console.log('[BACKEND] getUserStats Creating fallback stats...');
+      stats = { 
+        user: { 
+          id: parseInt(chatId), 
+          total_score: 0, 
+          total_questions: 0, 
+          total_correct: 0, 
+          learning_streak: 0,
+          experience_points: 0,
+          difficulty_level: 'beginner'
+        } 
+      };
     }
     
-    return new Response(JSON.stringify({
-      success: true,
-      data: stats
-    }), {
-      headers: { 'Content-Type': 'application/json' }
-    });
+    const result = { success: true, data: stats };
+    console.log('[BACKEND] getUserStats Final result:', result);
+    return jsonResponse(result);
   } catch (error) {
-    console.error('Error getting user stats:', error);
-    return new Response(JSON.stringify({
-      error: error.message
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-}
-
-// Получение достижений пользователя
-async function getUserAchievements(request, env) {
-  try {
-    const url = new URL(request.url);
-    const chatId = url.searchParams.get('chatId');
-    
-    if (!chatId) {
-      return new Response(JSON.stringify({
-        error: 'chatId parameter is required'
-      }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-    
-    const { DatabaseManager } = await import('./handlers/database.js');
-    const database = new DatabaseManager(env);
-    
-    const achievements = await database.getAchievements(parseInt(chatId));
-    
-    return new Response(JSON.stringify({
-      success: true,
-      data: achievements
-    }), {
-      headers: { 'Content-Type': 'application/json' }
-    });
-  } catch (error) {
-    console.error('Error getting user achievements:', error);
-    return new Response(JSON.stringify({
-      error: error.message
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    console.error('[BACKEND] getUserStats Error:', error);
+    console.error('[BACKEND] getUserStats Error stack:', error.stack);
+    return jsonResponse({ error: error.message }, 500);
   }
 }
 
 // Получение ежедневных заданий
 async function getDailyChallenges(request, env) {
+  console.log('[BACKEND] getDailyChallenges START');
   try {
     const url = new URL(request.url);
     const chatId = url.searchParams.get('chatId');
-    
+    console.log('[BACKEND] getDailyChallenges chatId:', chatId);
     if (!chatId) {
-      return new Response(JSON.stringify({
-        error: 'chatId parameter is required'
-      }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return jsonResponse({ error: 'chatId parameter is required' }, 400);
     }
     
-    const { DailyChallengeSystem } = await import('./handlers/dailyChallenges.js');
-    const { DatabaseManager } = await import('./handlers/database.js');
-    
-    const database = new DatabaseManager(env);
-    const dailyChallenges = new DailyChallengeSystem(database);
-    
-    const challenges = await dailyChallenges.getActiveChallenges(parseInt(chatId));
-    
-    return new Response(JSON.stringify({
-      success: true,
-      data: challenges
-    }), {
-      headers: { 'Content-Type': 'application/json' }
-    });
-  } catch (error) {
-    console.error('Error getting daily challenges:', error);
-    return new Response(JSON.stringify({
-      error: error.message
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-}
-
-// Экспорт данных пользователя
-async function exportUserData(request, env) {
-  try {
-    const { chatId } = await request.json();
-    
-    if (!chatId) {
-      return new Response(JSON.stringify({
-        error: 'chatId is required'
-      }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-    
-    const { DatabaseManager } = await import('./handlers/database.js');
-    const database = new DatabaseManager(env);
-    
-    const exportData = await database.exportUserData(parseInt(chatId));
-    
-    if (!exportData) {
-      return new Response(JSON.stringify({
-        error: 'User not found'
-      }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-    
-    return new Response(JSON.stringify({
-      success: true,
-      data: exportData
-    }), {
-      headers: { 'Content-Type': 'application/json' }
-    });
-  } catch (error) {
-    console.error('Error exporting user data:', error);
-    return new Response(JSON.stringify({
-      error: error.message
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-}
-
-// Тестирование документа с коктейлями
-async function testCocktailSheets(env) {
-  const cocktailSpreadsheetId = env.GOOGLE_SHEETS_COCKTAIL_SPREADSHEET_ID || '1yi9x61BR2puwtGgOND6FNmqqI7F9rb0e';
-  const apiKey = env.GOOGLE_SHEETS_API_KEY;
-  
-  try {
-    console.log('Testing Cocktail Google Sheets API...');
-    console.log('Cocktail Spreadsheet ID:', cocktailSpreadsheetId);
-    console.log('API Key:', apiKey ? 'Present' : 'Missing');
-    
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${cocktailSpreadsheetId}?key=${apiKey}`;
-    console.log('Request URL:', url);
-    
-    const response = await fetch(url);
-    const responseText = await response.text();
-    
-    console.log('Response status:', response.status);
-    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-    console.log('Response text (first 500 chars):', responseText.substring(0, 500));
-    
-    if (!response.ok) {
-      return new Response(JSON.stringify({
-        error: 'Cocktail Google Sheets API error',
-        status: response.status,
-        statusText: response.statusText,
-        response: responseText.substring(0, 1000)
-      }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-    
-    const data = JSON.parse(responseText);
-    
-    return new Response(JSON.stringify({
-      success: true,
-      spreadsheet: {
-        title: data.properties?.title,
-        sheets: data.sheets?.map(s => ({
-          title: s.properties?.title,
-          sheetId: s.properties?.sheetId
-        }))
+    // Простая реализация - возвращаем базовые задания
+    const challenges = [
+      {
+        id: 1,
+        title: 'Пройти быстрый тест',
+        description: 'Ответьте на 5 вопросов',
+        type: 'quick_test',
+        reward: 20,
+        completed: false
+      },
+      {
+        id: 2,
+        title: 'Изучить новую категорию',
+        description: 'Изучите любую категорию напитков',
+        type: 'category_study',
+        reward: 15,
+        completed: false
+      },
+      {
+        id: 3,
+        title: 'Задать вопрос ИИ',
+        description: 'Получите консультацию от ИИ-помощника',
+        type: 'ai_consultation',
+        reward: 10,
+        completed: false
       }
-    }), {
-      headers: { 'Content-Type': 'application/json' }
-    });
+    ];
+    
+    const result = { success: true, data: { challenges } };
+    console.log('[BACKEND] getDailyChallenges Final result:', result);
+    return jsonResponse(result);
   } catch (error) {
-    console.error('Cocktail Google Sheets test error:', error);
-    return new Response(JSON.stringify({
-      error: error.message,
-      stack: error.stack
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-}
-
-// Тестирование Google Sheets API (оставляем здесь, так как это тестовый эндпоинт)
-async function testGoogleSheets(env) {
-  const spreadsheetId = env.GOOGLE_SHEETS_SPREADSHEET_ID;
-  const apiKey = env.GOOGLE_SHEETS_API_KEY;
-  
-  try {
-    console.log('Testing Google Sheets API...');
-    console.log('Spreadsheet ID:', spreadsheetId);
-    console.log('API Key:', apiKey ? 'Present' : 'Missing');
-    
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?key=${apiKey}`;
-    console.log('Request URL:', url);
-    
-    const response = await fetch(url);
-    const responseText = await response.text();
-    
-    console.log('Response status:', response.status);
-    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-    console.log('Response text (first 500 chars):', responseText.substring(0, 500));
-    
-    if (!response.ok) {
-      return new Response(JSON.stringify({
-        error: 'Google Sheets API error',
-        status: response.status,
-        statusText: response.statusText,
-        response: responseText.substring(0, 1000)
-      }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-    
-    const data = JSON.parse(responseText);
-    
-    return new Response(JSON.stringify({
-      success: true,
-      spreadsheet: {
-        title: data.properties?.title,
-        sheets: data.sheets?.map(s => s.properties?.title)
-      }
-    }), {
-      headers: { 'Content-Type': 'application/json' }
-    });
-  } catch (error) {
-    console.error('Google Sheets test error:', error);
-    return new Response(JSON.stringify({
-      error: error.message,
-      stack: error.stack
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-}
-
-// Тестирование ID коктейлей
-async function testCocktailsIds(env) {
-  try {
-    const wines = await getWineData(env);
-    const cocktails = wines.filter(wine => 
-      ['Коктейли', 'Микс дринк', 'Лимонады и Милкшейки', 'Чай', 'Кофе', 'Премиксы', 'ПФ', 'нет в меню'].includes(wine.category)
-    );
-    
-    return new Response(JSON.stringify({
-      success: true,
-      total_cocktails: cocktails.length,
-      cocktails: cocktails.map(c => ({
-        id: c.id,
-        name: c.name,
-        category: c.category
-      }))
-    }, null, 2), {
-      headers: { 'Content-Type': 'application/json' }
-    });
-  } catch (error) {
-    console.error('Error testing cocktail IDs:', error);
-    return new Response(JSON.stringify({
-      error: error.message
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-}
-
-// Эндпоинт для получения статистики безопасности
-async function getSecurityStatsEndpoint(env) {
-  try {
-    const stats = getSecurityStats();
-    
-    return new Response(JSON.stringify({
-      success: true,
-      stats: stats,
-      timestamp: new Date().toISOString()
-    }), {
-      headers: { 'Content-Type': 'application/json' }
-    });
-  } catch (error) {
-    console.error('Security stats error:', error);
-    return new Response(JSON.stringify({
-      error: error.message
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-}
-
-// Эндпоинт для очистки кэша безопасности
-async function cleanupSecurityEndpoint(env) {
-  try {
-    const beforeSize = getSecurityStats().cacheSize;
-    cleanupSecurityCache();
-    const afterSize = getSecurityStats().cacheSize;
-    
-    return new Response(JSON.stringify({
-      success: true,
-      message: 'Security cache cleaned',
-      beforeSize: beforeSize,
-      afterSize: afterSize,
-      cleared: beforeSize - afterSize,
-      timestamp: new Date().toISOString()
-    }), {
-      headers: { 'Content-Type': 'application/json' }
-    });
-  } catch (error) {
-    console.error('Cleanup security error:', error);
-    return new Response(JSON.stringify({
-      error: error.message
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    console.error('[BACKEND] getDailyChallenges Error:', error);
+    return jsonResponse({ error: error.message }, 500);
   }
 }

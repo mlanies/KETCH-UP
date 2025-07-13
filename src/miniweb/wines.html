@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🍷 Напитки - Wine Learning Bot</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: white;
+            min-height: 100vh;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            padding: 20px 0;
+            border-bottom: 2px solid #f0f0f0;
+            margin-bottom: 20px;
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            margin-right: 15px;
+            color: #667eea;
+        }
+
+        .header h1 {
+            color: #8B4513;
+            font-size: 20px;
+        }
+
+        .search-section {
+            margin-bottom: 20px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 14px;
+            margin-bottom: 15px;
+            transition: border-color 0.2s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .filter-section {
+            margin-bottom: 20px;
+        }
+
+        .filter-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .filter-tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 5px;
+            margin-bottom: 15px;
+        }
+
+        .filter-tab {
+            flex: 1;
+            padding: 8px 12px;
+            text-align: center;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .filter-tab.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .filter-tab:not(.active) {
+            color: #666;
+        }
+
+        .filter-tab:not(.active):hover {
+            background: #e9ecef;
+        }
+
+        .category-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .category-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .category-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .category-card .icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .category-card .name {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .category-card .count {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+
+        .wines-list {
+            margin-bottom: 20px;
+        }
+
+        .wine-card {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .wine-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .wine-name {
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        .wine-details {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .wine-category {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 500;
+        }
+
+        .wine-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .action-btn {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 5px 10px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .error {
+            background: #ff6b6b;
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .no-results .icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: background 0.2s;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .btn:hover {
+            background: #5a6fd8;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        /* Модальное окно для деталей напитка */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            width: 90%;
+            max-width: 350px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .wine-info {
+            margin-bottom: 20px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #f8f9fa;
+        }
+
+        .info-label {
+            font-weight: 500;
+            color: #666;
+        }
+
+        .info-value {
+            color: #333;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .modal-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .modal-btn.primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .modal-btn.secondary {
+            background: #f8f9fa;
+            color: #333;
+            border: 1px solid #e9ecef;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <button class="back-btn" onclick="goBack()">←</button>
+            <h1>🍷 Напитки</h1>
+        </div>
+
+        <!-- Поиск -->
+        <div class="search-section">
+            <input type="text" class="search-input" placeholder="🔍 Поиск по названию..." id="search-input">
+        </div>
+
+        <!-- Фильтры -->
+        <div class="filter-section">
+            <div class="filter-title">Фильтры</div>
+            <div class="filter-tabs">
+                <div class="filter-tab active" onclick="setFilter('all')">Все</div>
+                <div class="filter-tab" onclick="setFilter('alcohol')">Алкоголь</div>
+                <div class="filter-tab" onclick="setFilter('non-alcohol')">Безалкогольные</div>
+            </div>
+        </div>
+
+        <!-- Категории -->
+        <div class="category-grid" id="category-grid">
+            <!-- Категории будут загружены динамически -->
+        </div>
+
+        <!-- Список напитков -->
+        <div class="wines-list" id="wines-list">
+            <!-- Напитки будут загружены динамически -->
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">
+            <div>Загрузка напитков...</div>
+        </div>
+
+        <div id="error" class="error" style="display: none;">
+            Произошла ошибка при загрузке данных
+        </div>
+
+        <div id="no-results" class="no-results" style="display: none;">
+            <div class="icon">🍷</div>
+            <div>Напитки не найдены</div>
+        </div>
+
+        <button class="btn btn-secondary" onclick="refreshData()">
+            🔄 Обновить данные
+        </button>
+    </div>
+
+    <!-- Модальное окно для деталей напитка -->
+    <div class="modal" id="wine-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title" id="modal-title">Название напитка</div>
+                <button class="close-btn" onclick="closeModal()">×</button>
+            </div>
+            <div class="wine-info" id="modal-wine-info">
+                <!-- Информация о напитке -->
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn secondary" onclick="askAIAboutWine()">🤖 Спросить ИИ</button>
+                <button class="modal-btn primary" onclick="closeModal()">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let tg = window.Telegram.WebApp;
+        let chatId = null;
+        let wines = [];
+        let filteredWines = [];
+        let currentFilter = 'all';
+        let currentCategory = null;
+        let selectedWine = null;
+
+        // Инициализация
+        tg.ready();
+        tg.expand();
+
+        // Получаем chat_id
+        function getChatId() {
+            const initData = tg.initData;
+            if (initData) {
+                const urlParams = new URLSearchParams(initData);
+                const user = urlParams.get('user');
+                if (user) {
+                    const userData = JSON.parse(decodeURIComponent(user));
+                    return userData.id;
+                }
+            }
+            return null;
+        }
+
+        // Загрузка данных о напитках
+        async function loadWinesData() {
+            try {
+                showLoading(true);
+                chatId = getChatId();
+
+                // Загружаем данные о напитках
+                const response = await fetch('/wine-data');
+                if (!response.ok) {
+                    throw new Error('Ошибка загрузки данных о напитках');
+                }
+
+                wines = await response.json();
+                filteredWines = [...wines];
+
+                updateCategories();
+                updateWinesList();
+                showLoading(false);
+            } catch (error) {
+                console.error('Error loading wines data:', error);
+                showError('Ошибка загрузки данных о напитках');
+                showLoading(false);
+            }
+        }
+
+        // Обновление категорий
+        function updateCategories() {
+            const categories = {};
+            
+            wines.forEach(wine => {
+                if (!categories[wine.category]) {
+                    categories[wine.category] = 0;
+                }
+                categories[wine.category]++;
+            });
+
+            const categoryGrid = document.getElementById('category-grid');
+            categoryGrid.innerHTML = '';
+
+            const categoryIcons = {
+                'Вина': '🍷',
+                'Виски': '🥃',
+                'Пиво': '🍺',
+                'Коктейли': '🍹',
+                'Кофе': '☕',
+                'Чай': '🍵',
+                'Лимонады и Милкшейки': '🥤',
+                'Премиксы': '🍯'
+            };
+
+            Object.entries(categories).forEach(([category, count]) => {
+                const categoryCard = document.createElement('div');
+                categoryCard.className = 'category-card';
+                categoryCard.onclick = () => selectCategory(category);
+                categoryCard.innerHTML = `
+                    <span class="icon">${categoryIcons[category] || '🍷'}</span>
+                    <div class="name">${category}</div>
+                    <div class="count">${count} шт.</div>
+                `;
+                categoryGrid.appendChild(categoryCard);
+            });
+        }
+
+        // Выбор категории
+        function selectCategory(category) {
+            currentCategory = category;
+            filterWines();
+        }
+
+        // Установка фильтра
+        function setFilter(filter) {
+            currentFilter = filter;
+            
+            // Обновляем активную вкладку
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            filterWines();
+        }
+
+        // Фильтрация напитков
+        function filterWines() {
+            let filtered = [...wines];
+
+            // Фильтр по типу
+            if (currentFilter === 'alcohol') {
+                filtered = filtered.filter(wine => 
+                    ['Вина', 'Виски', 'Пиво', 'Коктейли'].includes(wine.category)
+                );
+            } else if (currentFilter === 'non-alcohol') {
+                filtered = filtered.filter(wine => 
+                    ['Кофе', 'Чай', 'Лимонады и Милкшейки', 'Премиксы'].includes(wine.category)
+                );
+            }
+
+            // Фильтр по категории
+            if (currentCategory) {
+                filtered = filtered.filter(wine => wine.category === currentCategory);
+            }
+
+            // Фильтр по поиску
+            const searchTerm = document.getElementById('search-input').value.toLowerCase();
+            if (searchTerm) {
+                filtered = filtered.filter(wine => 
+                    wine.name.toLowerCase().includes(searchTerm)
+                );
+            }
+
+            filteredWines = filtered;
+            updateWinesList();
+        }
+
+        // Обновление списка напитков
+        function updateWinesList() {
+            const winesList = document.getElementById('wines-list');
+            winesList.innerHTML = '';
+
+            if (filteredWines.length === 0) {
+                document.getElementById('no-results').style.display = 'block';
+                return;
+            }
+
+            document.getElementById('no-results').style.display = 'none';
+
+            filteredWines.forEach(wine => {
+                const wineCard = document.createElement('div');
+                wineCard.className = 'wine-card';
+                wineCard.onclick = () => showWineDetails(wine);
+                
+                wineCard.innerHTML = `
+                    <div class="wine-name">${wine.name}</div>
+                    <div class="wine-details">
+                        ${wine.country ? `🌍 ${wine.country}` : ''}
+                        ${wine.alcohol ? ` | ${wine.alcohol}%` : ''}
+                        ${wine.sugar ? ` | ${wine.sugar}` : ''}
+                    </div>
+                    <div class="wine-category">${wine.category}</div>
+                    <div class="wine-actions">
+                        <button class="action-btn" onclick="event.stopPropagation(); askAIAboutWine('${wine.id}')">
+                            🤖 ИИ
+                        </button>
+                        <button class="action-btn" onclick="event.stopPropagation(); addToFavorites('${wine.id}')">
+                            ⭐ Избранное
+                        </button>
+                    </div>
+                `;
+                
+                winesList.appendChild(wineCard);
+            });
+        }
+
+        // Показать детали напитка
+        function showWineDetails(wine) {
+            selectedWine = wine;
+            
+            document.getElementById('modal-title').textContent = wine.name;
+            
+            const wineInfo = document.getElementById('modal-wine-info');
+            wineInfo.innerHTML = `
+                <div class="info-row">
+                    <span class="info-label">Категория:</span>
+                    <span class="info-value">${wine.category}</span>
+                </div>
+                ${wine.country ? `
+                <div class="info-row">
+                    <span class="info-label">Страна:</span>
+                    <span class="info-value">${wine.country}</span>
+                </div>
+                ` : ''}
+                ${wine.alcohol ? `
+                <div class="info-row">
+                    <span class="info-label">Крепость:</span>
+                    <span class="info-value">${wine.alcohol}%</span>
+                </div>
+                ` : ''}
+                ${wine.sugar ? `
+                <div class="info-row">
+                    <span class="info-label">Сахар:</span>
+                    <span class="info-value">${wine.sugar}</span>
+                </div>
+                ` : ''}
+                ${wine.description ? `
+                <div class="info-row">
+                    <span class="info-label">Описание:</span>
+                    <span class="info-value">${wine.description}</span>
+                </div>
+                ` : ''}
+            `;
+            
+            document.getElementById('wine-modal').style.display = 'block';
+        }
+
+        // Закрыть модальное окно
+        function closeModal() {
+            document.getElementById('wine-modal').style.display = 'none';
+            selectedWine = null;
+        }
+
+        // Спросить ИИ о напитке
+        function askAIAboutWine(wineId) {
+            const wine = wineId ? wines.find(w => w.id === wineId) : selectedWine;
+            if (wine) {
+                const question = prompt(`Задайте вопрос об ${wine.name}:`);
+                if (question) {
+                    tg.showAlert('Функция ИИ консультанта будет доступна в следующем обновлении');
+                }
+            }
+        }
+
+        // Добавить в избранное
+        function addToFavorites(wineId) {
+            tg.showAlert('Функция избранного будет доступна в следующем обновлении');
+        }
+
+        // Функции навигации
+        function goBack() {
+            window.history.back();
+        }
+
+        function refreshData() {
+            loadWinesData();
+        }
+
+        // Обработчики событий
+        document.getElementById('search-input').addEventListener('input', filterWines);
+
+        // Закрытие модального окна при клике вне его
+        document.getElementById('wine-modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+
+        // Загружаем данные при загрузке страницы
+        document.addEventListener('DOMContentLoaded', loadWinesData);
+    </script>
+</body>
+</html> 

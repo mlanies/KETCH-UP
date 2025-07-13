@@ -1,0 +1,27 @@
+name = "wine-frontend"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+[vars]
+# URL бэкенда API (основной воркер)
+API_URL = "https://wine.2gc.ru"
+
+# Домен для фронтенда
+FRONTEND_URL = "https://wine-app.2gc.ru"
+
+# Используем ту же базу данных
+[[d1_databases]]
+binding = "DB"
+database_name = "wine-bot-db"
+database_id = "4de41da1-d801-4e91-ab74-5107b445fb05"
+
+# Используем тот же KV для кэша
+[[kv_namespaces]]
+binding = "WINE_CACHE"
+id = "e7107413f4a7434a8e9d101b337dc5d4"
+preview_id = "97d3cb4a1aee4074b673f3ad3e057375"
+
+# Кастомный домен
+[[routes]]
+pattern = "wine-app.2gc.ru/*"
+zone_name = "2gc.ru" 

@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🥃 Алкогольные напитки</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .back-button {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            backdrop-filter: blur(10px);
+        }
+
+        .alcohol-section {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+            display: flex;
+            align-items: center;
+        }
+
+        .section-title .icon {
+            margin-right: 10px;
+            font-size: 24px;
+        }
+
+        .alcohol-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .alcohol-item {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            font-size: 14px;
+            font-weight: 500;
+            min-height: 60px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .alcohol-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+
+        .alcohol-item:active {
+            transform: translateY(0);
+        }
+
+        .alcohol-item .icon {
+            font-size: 20px;
+            margin-bottom: 5px;
+        }
+
+        .alcohol-item .text {
+            font-size: 12px;
+        }
+
+        .loading {
+            text-align: center;
+            color: white;
+            font-size: 16px;
+            padding: 40px 20px;
+        }
+
+        .error {
+            background: #ff6b6b;
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .wine-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .wine-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .wine-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .wine-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            flex: 1;
+        }
+
+        .wine-type {
+            background: #667eea;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+
+        .wine-details {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+
+        .wine-characteristics {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .characteristic {
+            background: #f8f9fa;
+            color: #667eea;
+            padding: 4px 8px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .filter-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .filter-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .filter-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .filter-option {
+            background: white;
+            border: 2px solid #e9ecef;
+            color: #666;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-option.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .filter-option:hover {
+            border-color: #667eea;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .alcohol-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <button class="back-button" onclick="goBack()">← Назад</button>
+    
+    <div class="container">
+        <div class="header">
+            <h1>🥃 Алкогольные напитки</h1>
+        </div>
+
+        <div class="loading" id="loading">
+            Загрузка напитков...
+        </div>
+
+        <div class="error" id="error" style="display: none;"></div>
+
+        <!-- Основные категории алкоголя -->
+        <div class="alcohol-section" id="mainCategories">
+            <div class="section-title">
+                <span class="icon">🥃</span>
+                Выберите категорию
+            </div>
+            <div class="alcohol-grid">
+                <button class="alcohol-item" onclick="loadCategory('wines')">
+                    <div class="icon">🍷</div>
+                    <div class="text">Вина</div>
+                </button>
+                <button class="alcohol-item" onclick="loadCategory('spirits')">
+                    <div class="icon">🥃</div>
+                    <div class="text">Крепкие напитки</div>
+                </button>
+                <button class="alcohol-item" onclick="loadCategory('beer')">
+                    <div class="icon">🍺</div>
+                    <div class="text">Пиво</div>
+                </button>
+                <button class="alcohol-item" onclick="loadCategory('champagne')">
+                    <div class="icon">🍾</div>
+                    <div class="text">Шампанское</div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Контент категории -->
+        <div id="categoryContent" style="display: none;"></div>
+    </div>
+
+    <script>
+        let tg = null;
+        let currentCategory = null;
+        let allWines = [];
+        let filteredWines = [];
+
+        // Инициализация Telegram Web App
+        function initTelegramApp() {
+            try {
+                tg = window.Telegram.WebApp;
+                tg.ready();
+                tg.expand();
+                
+                // Настройка темы
+                if (tg.colorScheme === 'dark') {
+                    document.body.style.background = 'linear-gradient(135deg, #2c3e50 0%, #34495e 100%)';
+                }
+                
+                return true;
+            } catch (error) {
+                console.error('Telegram Web App not available:', error);
+                return false;
+            }
+        }
+
+        // Загрузка категории алкоголя
+        async function loadCategory(category) {
+            try {
+                currentCategory = category;
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('mainCategories').style.display = 'none';
+                document.getElementById('categoryContent').style.display = 'none';
+
+                const response = await fetch(`/alcohol/${category}`);
+                if (!response.ok) {
+                    throw new Error('Failed to load alcohol data');
+                }
+
+                const alcoholData = await response.json();
+                displayCategoryContent(category, alcoholData);
+            } catch (error) {
+                console.error('Error loading category:', error);
+                showError('Ошибка загрузки данных: ' + error.message);
+                document.getElementById('mainCategories').style.display = 'block';
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        // Отображение содержимого категории
+        function displayCategoryContent(category, data) {
+            const contentDiv = document.getElementById('categoryContent');
+            const categoryNames = {
+                'wines': 'Вина',
+                'spirits': 'Крепкие напитки',
+                'beer': 'Пиво',
+                'champagne': 'Шампанское'
+            };
+
+            allWines = data || [];
+            filteredWines = [...allWines];
+
+            let html = `
+                <div class="alcohol-section">
+                    <div class="section-title">
+                        <span class="icon">${getCategoryIcon(category)}</span>
+                        ${categoryNames[category]}
+                    </div>
+                    <button class="back-button" onclick="showMainCategories()" style="position: static; margin-bottom: 15px;">
+                        ← Назад к категориям
+                    </button>
+            `;
+
+            // Добавляем фильтры для вин
+            if (category === 'wines' && allWines.length > 0) {
+                html += createFilters();
+            }
+
+            if (allWines.length > 0) {
+                filteredWines.forEach(wine => {
+                    html += createWineCard(wine);
+                });
+            } else {
+                html += `
+                    <div style="text-align: center; padding: 40px 20px; color: #666;">
+                        <div style="font-size: 48px; margin-bottom: 15px;">🥃</div>
+                        <div>Данные в разработке</div>
+                        <div style="font-size: 14px; margin-top: 10px;">Скоро здесь появится полная информация о напитках</div>
+                    </div>
+                `;
+            }
+
+            html += '</div>';
+            contentDiv.innerHTML = html;
+            contentDiv.style.display = 'block';
+
+            // Добавляем обработчики фильтров
+            if (category === 'wines') {
+                addFilterHandlers();
+            }
+        }
+
+        // Создание карточки вина
+        function createWineCard(wine) {
+            return `
+                <div class="wine-card" onclick="showWineDetails('${wine.id || wine.name}')">
+                    <div class="wine-header">
+                        <div class="wine-name">${wine.name || 'Название не указано'}</div>
+                        ${wine.type ? `<div class="wine-type">${wine.type}</div>` : ''}
+                    </div>
+                    ${wine.description ? `<div class="wine-details">${wine.description}</div>` : ''}
+                    <div class="wine-characteristics">
+                        ${wine.region ? `<span class="characteristic">${wine.region}</span>` : ''}
+                        ${wine.vintage ? `<span class="characteristic">${wine.vintage}</span>` : ''}
+                        ${wine.alcohol ? `<span class="characteristic">${wine.alcohol}%</span>` : ''}
+                        ${wine.price ? `<span class="characteristic">${wine.price} ₽</span>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Создание фильтров
+        function createFilters() {
+            const regions = [...new Set(allWines.map(wine => wine.region).filter(Boolean))];
+            const types = [...new Set(allWines.map(wine => wine.type).filter(Boolean))];
+
+            let html = `
+                <div class="filter-section">
+                    <div class="filter-title">Фильтры</div>
+            `;
+
+            if (regions.length > 0) {
+                html += `
+                    <div style="margin-bottom: 10px;">
+                        <div style="font-size: 14px; color: #666; margin-bottom: 5px;">Регион:</div>
+                        <div class="filter-options">
+                            <span class="filter-option active" data-filter="region" data-value="">Все</span>
+                            ${regions.map(region => 
+                                `<span class="filter-option" data-filter="region" data-value="${region}">${region}</span>`
+                            ).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (types.length > 0) {
+                html += `
+                    <div>
+                        <div style="font-size: 14px; color: #666; margin-bottom: 5px;">Тип:</div>
+                        <div class="filter-options">
+                            <span class="filter-option active" data-filter="type" data-value="">Все</span>
+                            ${types.map(type => 
+                                `<span class="filter-option" data-filter="type" data-value="${type}">${type}</span>`
+                            ).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += '</div>';
+            return html;
+        }
+
+        // Добавление обработчиков фильтров
+        function addFilterHandlers() {
+            const filterOptions = document.querySelectorAll('.filter-option');
+            filterOptions.forEach(option => {
+                option.addEventListener('click', function() {
+                    const filterType = this.dataset.filter;
+                    const filterValue = this.dataset.value;
+
+                    // Обновляем активный фильтр
+                    document.querySelectorAll(`[data-filter="${filterType}"]`).forEach(opt => {
+                        opt.classList.remove('active');
+                    });
+                    this.classList.add('active');
+
+                    // Применяем фильтры
+                    applyFilters();
+                });
+            });
+        }
+
+        // Применение фильтров
+        function applyFilters() {
+            const activeFilters = {};
+            document.querySelectorAll('.filter-option.active').forEach(option => {
+                const filterType = option.dataset.filter;
+                const filterValue = option.dataset.value;
+                if (filterValue) {
+                    activeFilters[filterType] = filterValue;
+                }
+            });
+
+            filteredWines = allWines.filter(wine => {
+                for (const [filterType, filterValue] of Object.entries(activeFilters)) {
+                    if (wine[filterType] !== filterValue) {
+                        return false;
+                    }
+                }
+                return true;
+            });
+
+            // Обновляем отображение
+            const contentDiv = document.getElementById('categoryContent');
+            const wineCards = contentDiv.querySelectorAll('.wine-card');
+            wineCards.forEach(card => card.remove());
+
+            filteredWines.forEach(wine => {
+                const wineCard = document.createElement('div');
+                wineCard.innerHTML = createWineCard(wine);
+                contentDiv.appendChild(wineCard.firstElementChild);
+            });
+        }
+
+        // Показать детали вина
+        function showWineDetails(wineId) {
+            // Здесь можно добавить модальное окно с подробной информацией
+            console.log('Show details for wine:', wineId);
+        }
+
+        // Получение иконки для категории
+        function getCategoryIcon(category) {
+            const icons = {
+                'wines': '🍷',
+                'spirits': '🥃',
+                'beer': '🍺',
+                'champagne': '🍾'
+            };
+            return icons[category] || '🥃';
+        }
+
+        // Показать основные категории
+        function showMainCategories() {
+            document.getElementById('mainCategories').style.display = 'block';
+            document.getElementById('categoryContent').style.display = 'none';
+            currentCategory = null;
+        }
+
+        // Назад
+        function goBack() {
+            if (currentCategory) {
+                showMainCategories();
+            } else {
+                window.location.href = '/miniweb';
+            }
+        }
+
+        // Показать ошибку
+        function showError(message) {
+            document.getElementById('error').textContent = message;
+            document.getElementById('error').style.display = 'block';
+        }
+
+        // Инициализация при загрузке
+        window.addEventListener('load', () => {
+            if (initTelegramApp()) {
+                document.getElementById('loading').style.display = 'none';
+            } else {
+                showError('Это приложение должно быть открыто через Telegram');
+            }
+        });
+    </script>
+</body>
+</html> 

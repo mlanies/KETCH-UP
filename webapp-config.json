@@ -1,0 +1,22 @@
+{
+  "name": "Wine Learning Bot",
+  "description": "Обучение официантов по ассортименту напитков ресторана KETCH UP",
+  "icon": "🍷",
+  "url": "https://telegram-wine-bot.2gc.workers.dev/miniweb",
+  "commands": [
+    {
+      "command": "start",
+      "description": "Запустить бота"
+    },
+    {
+      "command": "webapp",
+      "description": "Открыть Web App"
+    },
+    {
+      "command": "help",
+      "description": "Показать справку"
+    }
+  ],
+  "createdAt": "2025-07-13T15:25:03.970Z",
+  "version": "1.0.0"
+}

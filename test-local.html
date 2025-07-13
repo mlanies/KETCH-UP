@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🍷 Тестирование Web App</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .test-section {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+            display: flex;
+            align-items: center;
+        }
+
+        .section-title .icon {
+            margin-right: 10px;
+            font-size: 24px;
+        }
+
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .test-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            border: none;
+            border-radius: 15px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 60px;
+        }
+
+        .test-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+
+        .test-button .icon {
+            margin-right: 10px;
+            font-size: 20px;
+        }
+
+        .api-test {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .api-test h4 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .api-result {
+            background: #e9ecef;
+            border-radius: 8px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+
+        .success {
+            border-left: 4px solid #51cf66;
+        }
+
+        .error {
+            border-left: 4px solid #ff6b6b;
+        }
+
+        .loading {
+            border-left: 4px solid #ffd43b;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-success {
+            background: #51cf66;
+        }
+
+        .status-error {
+            background: #ff6b6b;
+        }
+
+        .status-loading {
+            background: #ffd43b;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .mock-telegram {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .mock-telegram h4 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .mock-user {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .mock-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #667eea;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            margin-right: 10px;
+        }
+
+        .mock-user-info {
+            flex: 1;
+        }
+
+        .mock-user-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .mock-user-id {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .toggle-mock {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .toggle-mock:hover {
+            background: #5a6fd8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🍷 Тестирование Web App</h1>
+            <p>Локальное тестирование страниц и API</p>
+        </div>
+
+        <!-- Мок Telegram пользователя -->
+        <div class="mock-telegram">
+            <h4>🤖 Мок Telegram пользователя</h4>
+            <div class="mock-user">
+                <div class="mock-avatar">М</div>
+                <div class="mock-user-info">
+                    <div class="mock-user-name">Максим Тестовый</div>
+                    <div class="mock-user-id">ID: 123456789</div>
+                </div>
+            </div>
+            <button class="toggle-mock" onclick="toggleMockUser()">Переключить мок пользователя</button>
+        </div>
+
+        <!-- Тестирование страниц -->
+        <div class="test-section">
+            <div class="section-title">
+                <span class="icon">📄</span>
+                Тестирование страниц Web App
+            </div>
+            <div class="button-grid">
+                <a href="http://localhost:8787/miniweb" target="_blank" class="test-button">
+                    <span class="icon">🏠</span>
+                    Главная страница
+                </a>
+                <a href="http://localhost:8787/miniweb/learning" target="_blank" class="test-button">
+                    <span class="icon">🎓</span>
+                    Обучение
+                </a>
+                <a href="http://localhost:8787/miniweb/wines" target="_blank" class="test-button">
+                    <span class="icon">🍷</span>
+                    База напитков
+                </a>
+                <a href="http://localhost:8787/miniweb/menu" target="_blank" class="test-button">
+                    <span class="icon">🍽️</span>
+                    Меню ресторана
+                </a>
+                <a href="http://localhost:8787/miniweb/alcohol" target="_blank" class="test-button">
+                    <span class="icon">🥃</span>
+                    Алкогольные напитки
+                </a>
+                <a href="http://localhost:8787/miniweb/search" target="_blank" class="test-button">
+                    <span class="icon">🔍</span>
+                    Поиск
+                </a>
+                <a href="http://localhost:8787/miniweb/achievements" target="_blank" class="test-button">
+                    <span class="icon">🏆</span>
+                    Достижения
+                </a>
+                <a href="http://localhost:8787/miniweb/challenges" target="_blank" class="test-button">
+                    <span class="icon">🎯</span>
+                    Ежедневные задания
+                </a>
+                <a href="http://localhost:8787/miniweb/ai" target="_blank" class="test-button">
+                    <span class="icon">🤖</span>
+                    ИИ помощник
+                </a>
+            </div>
+        </div>
+
+        <!-- Тестирование API -->
+        <div class="test-section">
+            <div class="section-title">
+                <span class="icon">🔌</span>
+                Тестирование API эндпоинтов
+            </div>
+            
+            <div class="api-test">
+                <h4>
+                    <span class="status-indicator status-loading" id="status-user-stats"></span>
+                    Статистика пользователя
+                </h4>
+                <button class="test-button" onclick="testAPI('user-stats')">Тестировать /user-stats</button>
+                <div class="api-result" id="result-user-stats">Нажмите кнопку для тестирования...</div>
+            </div>
+
+            <div class="api-test">
+                <h4>
+                    <span class="status-indicator status-loading" id="status-wine-data"></span>
+                    Данные о напитках
+                </h4>
+                <button class="test-button" onclick="testAPI('wine-data')">Тестировать /wine-data</button>
+                <div class="api-result" id="result-wine-data">Нажмите кнопку для тестирования...</div>
+            </div>
+
+            <div class="api-test">
+                <h4>
+                    <span class="status-indicator status-loading" id="status-menu"></span>
+                    Данные меню
+                </h4>
+                <button class="test-button" onclick="testAPI('menu')">Тестировать /menu/cocktails</button>
+                <div class="api-result" id="result-menu">Нажмите кнопку для тестирования...</div>
+            </div>
+
+            <div class="api-test">
+                <h4>
+                    <span class="status-indicator status-loading" id="status-alcohol"></span>
+                    Алкогольные напитки
+                </h4>
+                <button class="test-button" onclick="testAPI('alcohol')">Тестировать /alcohol/wines</button>
+                <div class="api-result" id="result-alcohol">Нажмите кнопку для тестирования...</div>
+            </div>
+
+            <div class="api-test">
+                <h4>
+                    <span class="status-indicator status-loading" id="status-search"></span>
+                    Поиск
+                </h4>
+                <button class="test-button" onclick="testAPI('search')">Тестировать /search?q=вино</button>
+                <div class="api-result" id="result-search">Нажмите кнопку для тестирования...</div>
+            </div>
+        </div>
+
+        <!-- Статус сервера -->
+        <div class="test-section">
+            <div class="section-title">
+                <span class="icon">🖥️</span>
+                Статус сервера
+            </div>
+            <div class="api-test">
+                <h4>
+                    <span class="status-indicator status-loading" id="status-server"></span>
+                    Проверка доступности
+                </h4>
+                <button class="test-button" onclick="checkServerStatus()">Проверить статус</button>
+                <div class="api-result" id="result-server">Нажмите кнопку для проверки...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Мок Telegram Web App API
+        let mockUser = {
+            id: 123456789,
+            first_name: 'Максим',
+            last_name: 'Тестовый',
+            username: 'test_user',
+            photo_url: null
+        };
+
+        // Переключение мок пользователя
+        function toggleMockUser() {
+            if (mockUser.id === 123456789) {
+                mockUser = {
+                    id: 987654321,
+                    first_name: 'Анна',
+                    last_name: 'Демо',
+                    username: 'demo_user',
+                    photo_url: null
+                };
+            } else {
+                mockUser = {
+                    id: 123456789,
+                    first_name: 'Максим',
+                    last_name: 'Тестовый',
+                    username: 'test_user',
+                    photo_url: null
+                };
+            }
+            
+            // Обновляем отображение
+            document.querySelector('.mock-user-name').textContent = `${mockUser.first_name} ${mockUser.last_name}`;
+            document.querySelector('.mock-user-id').textContent = `ID: ${mockUser.id}`;
+            document.querySelector('.mock-avatar').textContent = mockUser.first_name[0];
+        }
+
+        // Тестирование API
+        async function testAPI(endpoint) {
+            const resultElement = document.getElementById(`result-${endpoint.replace('-', '-')}`);
+            const statusElement = document.getElementById(`status-${endpoint.replace('-', '-')}`);
+            
+            resultElement.textContent = 'Загрузка...';
+            statusElement.className = 'status-indicator status-loading';
+            
+            try {
+                let url = `http://localhost:8787/${endpoint}`;
+                
+                // Добавляем параметры для определенных эндпоинтов
+                if (endpoint === 'user-stats') {
+                    url += `?chat_id=${mockUser.id}`;
+                } else if (endpoint === 'menu') {
+                    url = 'http://localhost:8787/menu/cocktails';
+                } else if (endpoint === 'alcohol') {
+                    url = 'http://localhost:8787/alcohol/wines';
+                } else if (endpoint === 'search') {
+                    url = 'http://localhost:8787/search?q=вино';
+                }
+                
+                const response = await fetch(url);
+                const data = await response.text();
+                
+                if (response.ok) {
+                    resultElement.textContent = `✅ Статус: ${response.status}\n\n${data.substring(0, 500)}${data.length > 500 ? '...' : ''}`;
+                    resultElement.className = 'api-result success';
+                    statusElement.className = 'status-indicator status-success';
+                } else {
+                    resultElement.textContent = `❌ Ошибка: ${response.status}\n\n${data}`;
+                    resultElement.className = 'api-result error';
+                    statusElement.className = 'status-indicator status-error';
+                }
+            } catch (error) {
+                resultElement.textContent = `❌ Ошибка подключения: ${error.message}`;
+                resultElement.className = 'api-result error';
+                statusElement.className = 'status-indicator status-error';
+            }
+        }
+
+        // Проверка статуса сервера
+        async function checkServerStatus() {
+            const resultElement = document.getElementById('result-server');
+            const statusElement = document.getElementById('status-server');
+            
+            resultElement.textContent = 'Проверка...';
+            statusElement.className = 'status-indicator status-loading';
+            
+            try {
+                const response = await fetch('http://localhost:8787/status');
+                const data = await response.text();
+                
+                if (response.ok) {
+                    resultElement.textContent = `✅ Сервер работает\nСтатус: ${response.status}\n\n${data}`;
+                    resultElement.className = 'api-result success';
+                    statusElement.className = 'status-indicator status-success';
+                } else {
+                    resultElement.textContent = `⚠️ Сервер отвечает с ошибкой\nСтатус: ${response.status}\n\n${data}`;
+                    resultElement.className = 'api-result error';
+                    statusElement.className = 'status-indicator status-error';
+                }
+            } catch (error) {
+                resultElement.textContent = `❌ Сервер недоступен\nОшибка: ${error.message}`;
+                resultElement.className = 'api-result error';
+                statusElement.className = 'status-indicator status-error';
+            }
+        }
+
+        // Автоматическая проверка статуса при загрузке
+        window.addEventListener('load', () => {
+            setTimeout(checkServerStatus, 1000);
+        });
+    </script>
+</body>
+</html> 

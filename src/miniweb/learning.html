@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎓 Обучение - Wine Learning Bot</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: white;
+            min-height: 100vh;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            padding: 20px 0;
+            border-bottom: 2px solid #f0f0f0;
+            margin-bottom: 30px;
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            margin-right: 15px;
+            color: #667eea;
+        }
+
+        .header h1 {
+            color: #8B4513;
+            font-size: 20px;
+        }
+
+        .learning-modes {
+            display: grid;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .mode-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .mode-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .mode-card .icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .mode-card .title {
+            font-weight: 600;
+            margin-bottom: 5px;
+            font-size: 16px;
+        }
+
+        .mode-card .description {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .progress-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .progress-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .progress-bar {
+            background: #e9ecef;
+            border-radius: 10px;
+            height: 8px;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: background 0.2s;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .btn:hover {
+            background: #5a6fd8;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .error {
+            background: #ff6b6b;
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        /* Стили для теста */
+        .question-container {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .question-text {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .answer-options {
+            display: grid;
+            gap: 10px;
+        }
+
+        .answer-option {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+
+        .answer-option:hover {
+            background: #e9ecef;
+            border-color: #667eea;
+        }
+
+        .answer-option.selected {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .answer-option.correct {
+            background: #28a745;
+            color: white;
+            border-color: #28a745;
+        }
+
+        .answer-option.incorrect {
+            background: #dc3545;
+            color: white;
+            border-color: #dc3545;
+        }
+
+        .question-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+        }
+
+        .question-counter {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .nav-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .nav-btn:hover {
+            background: #5a6268;
+        }
+
+        .nav-btn.primary {
+            background: #667eea;
+        }
+
+        .nav-btn.primary:hover {
+            background: #5a6fd8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <button class="back-btn" onclick="goBack()">←</button>
+            <h1>🎓 Обучение</h1>
+        </div>
+
+        <div id="learning-menu">
+            <!-- Режимы обучения -->
+            <div class="learning-modes">
+                <div class="mode-card" onclick="startQuickTest()">
+                    <span class="icon">⚡</span>
+                    <div class="title">Быстрый тест</div>
+                    <div class="description">5 случайных вопросов для быстрой проверки знаний</div>
+                </div>
+
+                <div class="mode-card" onclick="startCategoryLesson()">
+                    <span class="icon">📚</span>
+                    <div class="title">Урок по категории</div>
+                    <div class="description">Изучение конкретной категории напитков</div>
+                </div>
+
+                <div class="mode-card" onclick="startAILearning()">
+                    <span class="icon">🤖</span>
+                    <div class="title">ИИ-обучение</div>
+                    <div class="description">Персонализированные вопросы от искусственного интеллекта</div>
+                </div>
+
+                <div class="mode-card" onclick="startPersonalizedTest()">
+                    <span class="icon">🎯</span>
+                    <div class="title">Персонализированный тест</div>
+                    <div class="description">Вопросы на основе ваших слабых сторон</div>
+                </div>
+            </div>
+
+            <!-- Прогресс обучения -->
+            <div class="progress-section">
+                <div class="progress-title">📈 Ваш прогресс</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+                </div>
+                <div class="progress-text" id="progress-text">0% завершено</div>
+            </div>
+
+            <!-- Статистика обучения -->
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value" id="total-sessions">0</div>
+                    <div class="stat-label">Сессий</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="avg-score">0</div>
+                    <div class="stat-label">Средний балл</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="best-streak">0</div>
+                    <div class="stat-label">Лучшая серия</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="total-xp">0</div>
+                    <div class="stat-label">Опыт</div>
+                </div>
+            </div>
+
+            <button class="btn btn-secondary" onclick="showLearningHistory()">
+                📊 История обучения
+            </button>
+        </div>
+
+        <!-- Контейнер для теста -->
+        <div id="test-container" style="display: none;">
+            <div class="question-container">
+                <div class="question-text" id="question-text">
+                    Загрузка вопроса...
+                </div>
+                <div class="answer-options" id="answer-options">
+                    <!-- Варианты ответов будут загружены динамически -->
+                </div>
+            </div>
+
+            <div class="question-nav">
+                <div class="question-counter" id="question-counter">
+                    Вопрос 1 из 5
+                </div>
+                <div class="nav-buttons">
+                    <button class="nav-btn" onclick="previousQuestion()">←</button>
+                    <button class="nav-btn primary" onclick="nextQuestion()">Далее →</button>
+                </div>
+            </div>
+
+            <button class="btn" onclick="finishTest()" id="finish-btn" style="display: none;">
+                🏁 Завершить тест
+            </button>
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">
+            <div>Загрузка...</div>
+        </div>
+
+        <div id="error" class="error" style="display: none;">
+            Произошла ошибка
+        </div>
+    </div>
+
+    <script>
+        let tg = window.Telegram.WebApp;
+        let chatId = null;
+        let currentTest = null;
+        let currentQuestionIndex = 0;
+        let userAnswers = [];
+
+        // Инициализация
+        tg.ready();
+        tg.expand();
+
+        // Получаем chat_id
+        function getChatId() {
+            const initData = tg.initData;
+            if (initData) {
+                const urlParams = new URLSearchParams(initData);
+                const user = urlParams.get('user');
+                if (user) {
+                    const userData = JSON.parse(decodeURIComponent(user));
+                    return userData.id;
+                }
+            }
+            return null;
+        }
+
+        // Загрузка данных обучения
+        async function loadLearningData() {
+            try {
+                chatId = getChatId();
+                if (!chatId) {
+                    throw new Error('Не удалось получить ID пользователя');
+                }
+
+                const response = await fetch(`/user-stats?chatId=${chatId}`);
+                if (!response.ok) {
+                    throw new Error('Ошибка загрузки данных');
+                }
+
+                const userStats = await response.json();
+                updateLearningStats(userStats);
+            } catch (error) {
+                console.error('Error loading learning data:', error);
+                showError(error.message);
+            }
+        }
+
+        // Обновление статистики обучения
+        function updateLearningStats(stats) {
+            // Прогресс
+            const progress = Math.min((stats.total_questions / 100) * 100, 100);
+            document.getElementById('progress-fill').style.width = `${progress}%`;
+            document.getElementById('progress-text').textContent = `${Math.round(progress)}% завершено`;
+
+            // Статистика
+            document.getElementById('total-sessions').textContent = stats.total_sessions || 0;
+            document.getElementById('avg-score').textContent = stats.avg_score || 0;
+            document.getElementById('best-streak').textContent = stats.max_streak || 0;
+            document.getElementById('total-xp').textContent = stats.experience_points || 0;
+        }
+
+        // Функции навигации
+        function goBack() {
+            window.history.back();
+        }
+
+        function startQuickTest() {
+            showTest('quick_test');
+        }
+
+        function startCategoryLesson() {
+            tg.showAlert('Выберите категорию для изучения');
+            // Здесь можно добавить выбор категории
+        }
+
+        function startAILearning() {
+            showTest('ai_mode');
+        }
+
+        function startPersonalizedTest() {
+            showTest('personalized');
+        }
+
+        function showLearningHistory() {
+            tg.showAlert('История обучения будет доступна в следующем обновлении');
+        }
+
+        // Показать тест
+        function showTest(testType) {
+            document.getElementById('learning-menu').style.display = 'none';
+            document.getElementById('test-container').style.display = 'block';
+            
+            currentTest = {
+                type: testType,
+                questions: [],
+                currentIndex: 0
+            };
+            
+            loadTestQuestions(testType);
+        }
+
+        // Загрузка вопросов теста
+        async function loadTestQuestions(testType) {
+            try {
+                showLoading(true);
+                
+                // Здесь будет API вызов для получения вопросов
+                // Пока используем моковые данные
+                const mockQuestions = [
+                    {
+                        id: 1,
+                        text: "Какая температура подачи рекомендуется для красного вина?",
+                        options: ["8-12°C", "12-18°C", "18-22°C", "22-26°C"],
+                        correct: 2,
+                        category: "Вина",
+                        type: "serving_temp"
+                    },
+                    {
+                        id: 2,
+                        text: "С каким блюдом лучше всего сочетается сухое белое вино?",
+                        options: ["Красное мясо", "Рыба и морепродукты", "Сыр", "Десерт"],
+                        correct: 1,
+                        category: "Вина",
+                        type: "wine_pairing"
+                    }
+                ];
+
+                currentTest.questions = mockQuestions;
+                currentQuestionIndex = 0;
+                userAnswers = new Array(mockQuestions.length).fill(null);
+                
+                showQuestion(0);
+                showLoading(false);
+            } catch (error) {
+                console.error('Error loading test questions:', error);
+                showError('Ошибка загрузки вопросов');
+            }
+        }
+
+        // Показать вопрос
+        function showQuestion(index) {
+            if (index >= currentTest.questions.length) {
+                finishTest();
+                return;
+            }
+
+            const question = currentTest.questions[index];
+            document.getElementById('question-text').textContent = question.text;
+            document.getElementById('question-counter').textContent = `Вопрос ${index + 1} из ${currentTest.questions.length}`;
+
+            const optionsContainer = document.getElementById('answer-options');
+            optionsContainer.innerHTML = '';
+
+            question.options.forEach((option, optionIndex) => {
+                const optionEl = document.createElement('div');
+                optionEl.className = 'answer-option';
+                optionEl.textContent = option;
+                optionEl.onclick = () => selectAnswer(optionIndex);
+                
+                // Если ответ уже выбран, показываем его
+                if (userAnswers[index] !== null) {
+                    if (optionIndex === userAnswers[index]) {
+                        optionEl.classList.add('selected');
+                    }
+                    if (optionIndex === question.correct) {
+                        optionEl.classList.add('correct');
+                    } else if (optionIndex === userAnswers[index] && userAnswers[index] !== question.correct) {
+                        optionEl.classList.add('incorrect');
+                    }
+                }
+                
+                optionsContainer.appendChild(optionEl);
+            });
+
+            // Показываем кнопку завершения на последнем вопросе
+            if (index === currentTest.questions.length - 1) {
+                document.getElementById('finish-btn').style.display = 'block';
+            } else {
+                document.getElementById('finish-btn').style.display = 'none';
+            }
+        }
+
+        // Выбор ответа
+        function selectAnswer(optionIndex) {
+            userAnswers[currentQuestionIndex] = optionIndex;
+            
+            // Показываем правильный ответ
+            const options = document.querySelectorAll('.answer-option');
+            const question = currentTest.questions[currentQuestionIndex];
+            
+            options.forEach((option, index) => {
+                option.onclick = null; // Отключаем клики
+                
+                if (index === question.correct) {
+                    option.classList.add('correct');
+                } else if (index === optionIndex && optionIndex !== question.correct) {
+                    option.classList.add('incorrect');
+                }
+            });
+
+            // Автоматически переходим к следующему вопросу через 2 секунды
+            setTimeout(() => {
+                nextQuestion();
+            }, 2000);
+        }
+
+        // Следующий вопрос
+        function nextQuestion() {
+            if (currentQuestionIndex < currentTest.questions.length - 1) {
+                currentQuestionIndex++;
+                showQuestion(currentQuestionIndex);
+            }
+        }
+
+        // Предыдущий вопрос
+        function previousQuestion() {
+            if (currentQuestionIndex > 0) {
+                currentQuestionIndex--;
+                showQuestion(currentQuestionIndex);
+            }
+        }
+
+        // Завершить тест
+        function finishTest() {
+            const correctAnswers = userAnswers.filter((answer, index) => 
+                answer === currentTest.questions[index].correct
+            ).length;
+            
+            const score = Math.round((correctAnswers / currentTest.questions.length) * 100);
+            
+            tg.showAlert(`Тест завершен!\n\nПравильных ответов: ${correctAnswers} из ${currentTest.questions.length}\nВаш результат: ${score}%`);
+            
+            // Возвращаемся к меню обучения
+            document.getElementById('test-container').style.display = 'none';
+            document.getElementById('learning-menu').style.display = 'block';
+        }
+
+        // Вспомогательные функции
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        function showError(message) {
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('error').textContent = message;
+        }
+
+        // Загружаем данные при загрузке страницы
+        document.addEventListener('DOMContentLoaded', loadLearningData);
+    </script>
+</body>
+</html> 
