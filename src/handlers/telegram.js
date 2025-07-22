@@ -95,6 +95,29 @@ export async function handleMessage(message, env) {
         await sendMessage(chatId, `sheetId: ${sheetId}, но лист не найден.`, env);
       }
       return;
+    } else if (text === '/recommend') {
+      // Персональные рекомендации по обучению
+      const { generatePersonalizedReport, getUserAnalytics } = await import('./learningAnalytics.js');
+      const report = await generatePersonalizedReport(chatId, env);
+      const analytics = getUserAnalytics(chatId);
+      const weakCategories = analytics.weakCategories || [];
+      const accuracy = analytics.getOverallAccuracy();
+      const totalQuestions = analytics.totalQuestions;
+      const weakCategoryButtons = weakCategories.slice(0, 3).map(cat => ([{ text: `Тест по ${cat}`, callback_data: `learning_category_${cat}` }]));
+      const aiModeButton = (accuracy > 0.8 && totalQuestions > 20) ? [[{ text: '🤖 ИИ-режим', callback_data: 'learning_ai_mode' }]] : [];
+      const keyboard = {
+        inline_keyboard: [
+          ...weakCategoryButtons,
+          ...aiModeButton
+        ]
+      };
+      await sendMessageWithKeyboard(chatId, report, keyboard, env);
+      return;
+    } else if (env.__awaiting_feedback && env.__awaiting_feedback[chatId]) {
+      env.__awaiting_feedback[chatId] = false;
+      // Здесь можно сохранить text как фидбек (например, в базу или лог)
+      await sendMessage(chatId, 'Спасибо за ваш подробный отзыв!', env);
+      return;
     } else {
       // Поиск по названию вина
       await searchWineByName(text, chatId, env);

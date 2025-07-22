@@ -9,7 +9,8 @@ import {
   generatePersonalizedReport,
   generatePersonalizedAIQuestion,
   showDetailedAnalytics,
-  exportUserData
+  exportUserData,
+  getUserAnalytics
 } from './learningAnalytics.js';
 import { DatabaseManager } from './database.js';
 import { AchievementSystem } from './achievements.js';
@@ -618,8 +619,27 @@ async function finishLesson(chatId, env) {
   const achievements = new AchievementSystem(database, env);
   const dailyChallenges = new DailyChallengeSystem(database, env);
   
-  const accuracy = Math.round((state.correctAnswers / state.totalQuestions) * 100);
-  const grade = getGrade(accuracy);
+  const analyticsFinish = getUserAnalytics(chatId);
+  const weakCategoriesFinish = analyticsFinish.weakCategories || [];
+  const accuracyFinish = analyticsFinish.getOverallAccuracy();
+  const totalQuestionsFinish = analyticsFinish.totalQuestions;
+
+  const weakCategoryButtonsFinish = weakCategoriesFinish.slice(0, 3).map(cat => ([{ text: `Тест по ${cat}`, callback_data: `learning_category_${cat}` }]));
+  const aiModeButtonFinish = (accuracyFinish > 0.8 && totalQuestionsFinish > 20) ? [[{ text: '🤖 ИИ-режим', callback_data: 'learning_ai_mode' }]] : [];
+  const mainButtonsFinish = [
+    [{ text: '🎯 Быстрый тест', callback_data: 'learning_quick_test' }],
+    [{ text: '📊 Детальная аналитика', callback_data: 'learning_detailed_analytics' }],
+    [{ text: '🏁 Завершить', callback_data: 'learning_finish' }]
+  ];
+  const keyboardFinish = {
+    inline_keyboard: [
+      ...weakCategoryButtonsFinish,
+      ...aiModeButtonFinish,
+      ...mainButtonsFinish
+    ]
+  };
+  
+  const grade = getGrade(accuracyFinish);
   
   // Завершаем сессию в базе данных
   if (state.sessionId) {
@@ -665,20 +685,20 @@ async function finishLesson(chatId, env) {
   }
   
   // Проверяем ежедневные задания
-  if (accuracy >= 80 && state.totalQuestions >= 5) {
-    await dailyChallenges.checkAndUpdateProgress(chatId, 'test_completed', accuracy);
+  if (accuracyFinish >= 80 && state.totalQuestions >= 5) {
+    await dailyChallenges.checkAndUpdateProgress(chatId, 'test_completed', accuracyFinish);
   }
   
   let message = `🎓 *Урок завершен!*\n\n`;
   message += `📊 *Результаты:*\n`;
   message += `✅ Правильных ответов: ${state.correctAnswers}/${state.totalQuestions}\n`;
-  message += `📈 Точность: ${accuracy}%\n`;
+  message += `📈 Точность: ${accuracyFinish}%\n`;
   message += `🏆 Оценка: ${grade}\n`;
   message += `💎 Общий счет: ${state.score} баллов\n`;
   message += `💎 Опыт: +${userStats.experiencePoints} XP\n\n`;
   
   // Бонус за идеальный тест
-  if (accuracy === 100 && state.totalQuestions >= 5) {
+  if (accuracyFinish === 100 && state.totalQuestions >= 5) {
     const perfectRewards = achievements.calculatePerfectTestRewards(state.totalQuestions);
     message += `✨ *Идеальный тест!* +${perfectRewards.points} бонусных баллов\n\n`;
   }
@@ -700,22 +720,30 @@ async function finishLesson(chatId, env) {
     message += '\n';
   }
   
+  // Получаем аналитику пользователя
+  const analytics = getUserAnalytics(chatId);
+  const weakCategories = analytics.weakCategories || [];
+  const accuracy = analytics.getOverallAccuracy();
+  const totalQuestions = analytics.totalQuestions;
+
+  // Формируем кнопки для слабых тем
+  const weakCategoryButtons = weakCategories.slice(0, 3).map(cat => ([{ text: `Тест по ${cat}`, callback_data: `learning_category_${cat}` }]));
+
+  // Кнопка AI-режима для продвинутых
+  const aiModeButton = (accuracy > 0.8 && totalQuestions > 20) ? [[{ text: '🤖 ИИ-режим', callback_data: 'learning_ai_mode' }]] : [];
+
+  // Основные кнопки
+  const mainButtons = [
+    [{ text: '🎯 Быстрый тест', callback_data: 'learning_quick_test' }],
+    [{ text: '📊 Детальная аналитика', callback_data: 'learning_detailed_analytics' }],
+    [{ text: '🏁 Завершить', callback_data: 'learning_finish' }]
+  ];
+
   const keyboard = {
     inline_keyboard: [
-      [
-        { text: '🔄 Повторить тест', callback_data: 'learning_quick_test' },
-        { text: '🧠 ИИ-режим', callback_data: 'learning_ai_mode' }
-      ],
-      [
-        { text: '📚 Другой урок', callback_data: 'learning_category_lesson' },
-        { text: '📊 Прогресс', callback_data: 'learning_progress' }
-      ],
-      [
-        { text: '🎯 Персонализированный тест', callback_data: 'learning_personalized_test' }
-      ],
-      [
-        { text: '🔙 Главное меню', callback_data: 'main_menu' }
-      ]
+      ...weakCategoryButtons,
+      ...aiModeButton,
+      ...mainButtons
     ]
   };
   
@@ -734,6 +762,21 @@ async function finishLesson(chatId, env) {
   state.currentLesson = null;
   state.currentQuestion = null;
   state.sessionId = null;
+
+  // После отправки итогового сообщения и рекомендаций отправляем опрос для сбора обратной связи
+  const feedbackKeyboard = {
+    inline_keyboard: [
+      [
+        { text: '👍 Всё понравилось', callback_data: 'feedback_like' },
+        { text: '🤔 Были сложные вопросы', callback_data: 'feedback_hard' }
+      ],
+      [
+        { text: '😴 Слишком легко', callback_data: 'feedback_easy' },
+        { text: '✍️ Оставить комментарий', callback_data: 'feedback_comment' }
+      ]
+    ]
+  };
+  await sendMessageWithKeyboard(chatId, '🗣️ *Обратная связь*\nЧто было сложно/понравилось? Выберите вариант или напишите свой комментарий.', feedbackKeyboard, env);
 }
 
 // Получение оценки
@@ -779,23 +822,34 @@ export async function showProgress(chatId, env) {
   // Генерируем персонализированный отчет
   const report = await generatePersonalizedReport(chatId, env);
   
-  const keyboard = {
+  // Получаем аналитику пользователя
+  const analyticsProgress = getUserAnalytics(chatId);
+  const weakCategoriesProgress = analyticsProgress.weakCategories || [];
+  const accuracyProgress = analyticsProgress.getOverallAccuracy();
+  const totalQuestionsProgress = analyticsProgress.totalQuestions;
+
+  // Формируем кнопки для слабых тем
+  const weakCategoryButtonsProgress = weakCategoriesProgress.slice(0, 3).map(cat => ([{ text: `Тест по ${cat}`, callback_data: `learning_category_${cat}` }]));
+
+  // Кнопка AI-режима для продвинутых
+  const aiModeButtonProgress = (accuracyProgress > 0.8 && totalQuestionsProgress > 20) ? [[{ text: '🤖 ИИ-режим', callback_data: 'learning_ai_mode' }]] : [];
+
+  // Основные кнопки
+  const mainButtonsProgress = [
+    [{ text: '🎯 Быстрый тест', callback_data: 'learning_quick_test' }],
+    [{ text: '📊 Детальная аналитика', callback_data: 'learning_detailed_analytics' }],
+    [{ text: '🏁 Завершить', callback_data: 'learning_finish' }]
+  ];
+
+  const keyboardProgress = {
     inline_keyboard: [
-      [
-        { text: '🎯 Продолжить обучение', callback_data: 'learning_quick_test' },
-        { text: '🧠 ИИ-режим', callback_data: 'learning_ai_mode' }
-      ],
-      [
-        { text: '📈 Детальная аналитика', callback_data: 'learning_detailed_analytics' },
-        { text: '🎯 Персонализированный тест', callback_data: 'learning_personalized_test' }
-      ],
-      [
-        { text: '🔙 Назад', callback_data: 'learning_start' }
-      ]
+      ...weakCategoryButtonsProgress,
+      ...aiModeButtonProgress,
+      ...mainButtonsProgress
     ]
   };
   
-  await sendMessageWithKeyboard(chatId, report, keyboard, env);
+  await sendMessageWithKeyboard(chatId, report, keyboardProgress, env);
 }
 
 // Обработка callback query для обучения
@@ -870,6 +924,23 @@ export async function handleLearningCallback(data, chatId, messageId, env) {
       await showAchievementsHistory(chatId, env);
     } else if (data === 'detailed_stats') {
       await showDetailedStats(chatId, env);
+    } else if (data === 'feedback_like') {
+      await sendMessage(chatId, 'Спасибо за ваш отзыв! 😊', env);
+      // Здесь можно сохранить фидбек в базу/лог
+      return;
+    } else if (data === 'feedback_hard') {
+      await sendMessage(chatId, 'Спасибо! Мы учтём, что вопросы были сложными.', env);
+      // Здесь можно сохранить фидбек в базу/лог
+      return;
+    } else if (data === 'feedback_easy') {
+      await sendMessage(chatId, 'Спасибо! Мы постараемся сделать вопросы интереснее.', env);
+      // Здесь можно сохранить фидбек в базу/лог
+      return;
+    } else if (data === 'feedback_comment') {
+      if (!env.__awaiting_feedback) env.__awaiting_feedback = {};
+      env.__awaiting_feedback[chatId] = true;
+      await sendMessage(chatId, 'Пожалуйста, напишите ваш комментарий в ответном сообщении.', env);
+      return;
     }
   } catch (error) {
     console.error('Learning callback error:', error);
