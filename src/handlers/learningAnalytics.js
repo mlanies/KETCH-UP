@@ -194,7 +194,7 @@ export async function generatePersonalizedReport(chatId, env) {
 }
 
 // Генерация персонализированных вопросов с помощью ИИ
-export async function generatePersonalizedAIQuestion(chatId, env) {
+export async function generatePersonalizedAIQuestion(chatId, env, userContext = {}) {
   const analytics = getUserAnalytics(chatId);
   const wines = await getWineData(env);
   
@@ -220,9 +220,9 @@ export async function generatePersonalizedAIQuestion(chatId, env) {
   const accuracy = analytics.getOverallAccuracy();
   const difficulty = accuracy > 0.8 ? 'продвинутый' : accuracy > 0.6 ? 'средний' : 'начальный';
   
-  const prompt = `Ты эксперт-сомелье, создающий персонализированные вопросы для обучения официанта.
+  let prompt = `Ты эксперт-сомелье, создающий персонализированные вопросы для обучения официанта.
 
-Создай один вопрос с 4 вариантами ответа для обучения официанта.
+Создай ОДИН вопрос с 4 вариантами ответа (только один правильный) для обучения официанта.
 
 Информация о напитке:
 Название: ${randomWine.name}
@@ -238,7 +238,7 @@ ${randomWine.ingredients ? `Состав: ${randomWine.ingredients}` : ''}
 Уровень сложности: ${difficulty}
 Целевая категория: ${targetCategory}
 
-Формат ответа (строго):
+Формат ответа (СТРОГО!):
 ВОПРОС: [вопрос]
 A) [вариант A]
 B) [вариант B]
@@ -247,18 +247,34 @@ D) [вариант D]
 ПРАВИЛЬНЫЙ: [буква правильного ответа]
 ОБЪЯСНЕНИЕ: [краткое объяснение почему это правильный ответ]
 
-Сделай вопрос интересным и практичным для официанта.`;
+Пример:
+ВОПРОС: Какой основной сорт винограда используется в вине X?
+A) Каберне Совиньон
+B) Мерло
+C) Шардоне
+D) Пино Нуар
+ПРАВИЛЬНЫЙ: C
+ОБЪЯСНЕНИЕ: В вине X используется сорт Шардоне.
+
+Не добавляй никаких пояснений, только строго по формату!`;
+
+  // Добавим персонализацию, если есть userContext
+  if (userContext && userContext.difficulty) {
+    prompt += `\n\nУровень знаний пользователя: ${userContext.difficulty}`;
+  }
+  if (userContext && userContext.preferences) {
+    prompt += `\n\nПредпочтения пользователя: ${userContext.preferences.join(', ')}`;
+  }
 
   try {
     const aiResponse = await askCloudflareAI(prompt, env);
-    
-    // Парсим ответ ИИ
-    const lines = aiResponse.split('\n');
+    // Фильтрация лишнего текста (например, "Конечно, вот ваш вопрос:")
+    const cleanResponse = aiResponse.replace(/^(Конечно, вот ваш вопрос:|Вот ваш вопрос:|Вопрос:|Q:)/i, '').trim();
+    const lines = cleanResponse.split('\n');
     let question = '';
     let options = {};
     let correctAnswer = '';
     let explanation = '';
-    
     for (let line of lines) {
       line = line.trim();
       if (line.startsWith('ВОПРОС:')) {
@@ -277,7 +293,6 @@ D) [вариант D]
         explanation = line.replace('ОБЪЯСНЕНИЕ:', '').trim();
       }
     }
-    
     if (question && Object.keys(options).length === 4 && correctAnswer && explanation) {
       return {
         question,
@@ -293,7 +308,6 @@ D) [вариант D]
   } catch (error) {
     console.error('Error generating personalized AI question:', error);
   }
-  
   return null;
 }
 

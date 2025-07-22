@@ -22,3 +22,7 @@ preview_id = "97d3cb4a1aee4074b673f3ad3e057375"
 binding = "DB"
 database_name = "wine-bot-db"
 database_id = "4de41da1-d801-4e91-ab74-5107b445fb05" 
+
+[triggers]
+crons = ["00 15 * * *"]
+# Каждый день в 18:00 по Москве (МСК, UTC+3) 

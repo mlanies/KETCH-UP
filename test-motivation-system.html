@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест мотивационной системы</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        wine: {
+                            50: '#fdf2f8',
+                            100: '#fce7f3',
+                            200: '#fbcfe8',
+                            300: '#f9a8d4',
+                            400: '#f472b6',
+                            500: '#ec4899',
+                            600: '#db2777',
+                            700: '#be185d',
+                            800: '#9d174d',
+                            900: '#831843',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .card {
+            @apply bg-slate-800/80 backdrop-blur-sm border border-slate-700/50 rounded-xl p-4 shadow-lg hover:shadow-xl transition-all duration-200;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-white min-h-screen p-6">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold mb-8 text-center">🧠 Тест мотивационной системы</h1>
+        
+        <!-- Форма для ввода chatId -->
+        <div class="card mb-6">
+            <h2 class="text-xl font-semibold mb-4">Настройки теста</h2>
+            <div class="flex gap-4 items-end">
+                <div class="flex-1">
+                    <label class="block text-sm font-medium mb-2">Chat ID пользователя:</label>
+                    <input type="number" id="chatId" placeholder="123456789" 
+                           class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-wine-500">
+                </div>
+                <button onclick="testMotivationSystem()" 
+                        class="px-6 py-2 bg-wine-600 hover:bg-wine-700 text-white rounded-lg transition-colors">
+                    Запустить тест
+                </button>
+            </div>
+        </div>
+
+        <!-- Результаты тестов -->
+        <div id="results" class="space-y-6"></div>
+
+        <!-- Логи -->
+        <div class="card mt-6">
+            <h2 class="text-xl font-semibold mb-4">Логи выполнения</h2>
+            <div id="logs" class="bg-slate-900 p-4 rounded-lg font-mono text-sm max-h-96 overflow-y-auto"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://telegram-wine-bot.2gc.workers.dev';
+        
+        function log(message, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? 'text-red-400' : type === 'success' ? 'text-green-400' : 'text-blue-400';
+            logsDiv.innerHTML += `<div class="${color}">[${timestamp}] ${message}</div>`;
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+
+        function showResult(title, data, success = true) {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `card ${success ? 'border-green-500/30' : 'border-red-500/30'}`;
+            
+            resultDiv.innerHTML = `
+                <h3 class="text-lg font-semibold mb-3 ${success ? 'text-green-400' : 'text-red-400'}">
+                    ${success ? '✅' : '❌'} ${title}
+                </h3>
+                <pre class="bg-slate-900 p-4 rounded-lg overflow-x-auto text-sm">${JSON.stringify(data, null, 2)}</pre>
+            `;
+            
+            resultsDiv.appendChild(resultDiv);
+        }
+
+        async function testMotivationSystem() {
+            const chatId = document.getElementById('chatId').value;
+            if (!chatId) {
+                alert('Введите Chat ID');
+                return;
+            }
+
+            // Очищаем предыдущие результаты
+            document.getElementById('results').innerHTML = '';
+            document.getElementById('logs').innerHTML = '';
+
+            log('Начинаем тестирование мотивационной системы...', 'info');
+
+            try {
+                // Тест 1: Анализ мотивации
+                log('Тест 1: Анализ мотивации пользователя...', 'info');
+                const motivationResponse = await fetch(`${API_BASE_URL}/motivation/analyze`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chatId: parseInt(chatId) })
+                });
+                
+                const motivationData = await motivationResponse.json();
+                if (motivationResponse.ok && motivationData.success) {
+                    log('✅ Анализ мотивации успешен', 'success');
+                    showResult('Анализ мотивации', motivationData);
+                } else {
+                    log(`❌ Ошибка анализа мотивации: ${motivationData.error || 'Неизвестная ошибка'}`, 'error');
+                    showResult('Анализ мотивации', motivationData, false);
+                }
+
+                // Тест 2: Получение статистики пользователя
+                log('Тест 2: Получение статистики пользователя...', 'info');
+                const statsResponse = await fetch(`${API_BASE_URL}/user-stats?chatId=${chatId}`);
+                const statsData = await statsResponse.json();
+                if (statsResponse.ok) {
+                    log('✅ Статистика пользователя получена', 'success');
+                    showResult('Статистика пользователя', statsData);
+                } else {
+                    log(`❌ Ошибка получения статистики: ${statsData.error || 'Неизвестная ошибка'}`, 'error');
+                    showResult('Статистика пользователя', statsData, false);
+                }
+
+                // Тест 3: Получение достижений
+                log('Тест 3: Получение достижений пользователя...', 'info');
+                const achievementsResponse = await fetch(`${API_BASE_URL}/achievements/user?chatId=${chatId}`);
+                const achievementsData = await achievementsResponse.json();
+                if (achievementsResponse.ok && achievementsData.success) {
+                    log('✅ Достижения пользователя получены', 'success');
+                    showResult('Достижения пользователя', achievementsData);
+                } else {
+                    log(`❌ Ошибка получения достижений: ${achievementsData.error || 'Неизвестная ошибка'}`, 'error');
+                    showResult('Достижения пользователя', achievementsData, false);
+                }
+
+                // Тест 4: Получение наград
+                log('Тест 4: Получение наград пользователя...', 'info');
+                const rewardsResponse = await fetch(`${API_BASE_URL}/rewards/user?chatId=${chatId}`);
+                const rewardsData = await rewardsResponse.json();
+                if (rewardsResponse.ok && rewardsData.success) {
+                    log('✅ Награды пользователя получены', 'success');
+                    showResult('Награды пользователя', rewardsData);
+                } else {
+                    log(`❌ Ошибка получения наград: ${rewardsData.error || 'Неизвестная ошибка'}`, 'error');
+                    showResult('Награды пользователя', rewardsData, false);
+                }
+
+                // Тест 5: Получение мотивационных сообщений
+                log('Тест 5: Получение мотивационных сообщений...', 'info');
+                const messagesResponse = await fetch(`${API_BASE_URL}/motivation/messages?chatId=${chatId}`);
+                const messagesData = await messagesResponse.json();
+                if (messagesResponse.ok && messagesData.success) {
+                    log('✅ Мотивационные сообщения получены', 'success');
+                    showResult('Мотивационные сообщения', messagesData);
+                } else {
+                    log(`❌ Ошибка получения сообщений: ${messagesData.error || 'Неизвестная ошибка'}`, 'error');
+                    showResult('Мотивационные сообщения', messagesData, false);
+                }
+
+                // Тест 6: Быстрый тест
+                log('Тест 6: Запуск быстрого теста...', 'info');
+                const quickTestResponse = await fetch(`${API_BASE_URL}/start-quick-test`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chatId: parseInt(chatId) })
+                });
+                const quickTestData = await quickTestResponse.json();
+                if (quickTestResponse.ok && quickTestData.success) {
+                    log('✅ Быстрый тест запущен', 'success');
+                    showResult('Быстрый тест', quickTestData);
+                } else {
+                    log(`❌ Ошибка запуска быстрого теста: ${quickTestData.error || 'Неизвестная ошибка'}`, 'error');
+                    showResult('Быстрый тест', quickTestData, false);
+                }
+
+                // Тест 7: Получение категорий
+                log('Тест 7: Получение категорий...', 'info');
+                const categoriesResponse = await fetch(`${API_BASE_URL}/categories`);
+                const categoriesData = await categoriesResponse.json();
+                if (categoriesResponse.ok && categoriesData.success) {
+                    log('✅ Категории получены', 'success');
+                    showResult('Категории', categoriesData);
+                } else {
+                    log(`❌ Ошибка получения категорий: ${categoriesData.error || 'Неизвестная ошибка'}`, 'error');
+                    showResult('Категории', categoriesData, false);
+                }
+
+                log('Тестирование завершено!', 'success');
+
+            } catch (error) {
+                log(`❌ Критическая ошибка: ${error.message}`, 'error');
+                showResult('Критическая ошибка', { error: error.message }, false);
+            }
+        }
+
+        // Автозаполнение тестового chatId
+        document.getElementById('chatId').value = '123456789';
+    </script>
+</body>
+</html> 

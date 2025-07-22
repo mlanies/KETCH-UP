@@ -1,10 +1,258 @@
 // Управление базой данных для системы обучения
 // Интеграция с Cloudflare D1
 
+// Расширенная система достижений
+export const ACHIEVEMENT_TYPES = {
+  // Базовые достижения
+  FIRST_TEST: {
+    id: 'first_test_completed',
+    name: 'Первый шаг',
+    description: 'Пройдите свой первый тест',
+    icon: '🎯',
+    points: 50,
+    type: 'basic'
+  },
+  
+  // Серии и стрики
+  STREAK_3_DAYS: {
+    id: 'streak_3_days',
+    name: 'Постоянство',
+    description: 'Проходите тесты 3 дня подряд',
+    icon: '🔥',
+    points: 100,
+    type: 'streak'
+  },
+  STREAK_7_DAYS: {
+    id: 'streak_7_days',
+    name: 'Недельный марафон',
+    description: 'Проходите тесты 7 дней подряд',
+    icon: '🏃‍♂️',
+    points: 250,
+    type: 'streak'
+  },
+  
+  // Качество ответов
+  PERFECT_SCORE: {
+    id: 'perfect_score',
+    name: 'Отличник',
+    description: 'Получите 100% правильных ответов',
+    icon: '⭐',
+    points: 200,
+    type: 'quality'
+  },
+  SPEED_DEMON: {
+    id: 'speed_demon',
+    name: 'Скорость',
+    description: 'Отвечайте быстрее 10 секунд',
+    icon: '⚡',
+    points: 75,
+    type: 'speed'
+  },
+  
+  // Мастерство по категориям
+  CATEGORY_MASTER: {
+    id: 'category_master',
+    name: 'Мастер категории',
+    description: 'Достигните 90%+ в любой категории',
+    icon: '👑',
+    points: 300,
+    type: 'mastery'
+  },
+  
+  // Социальные достижения
+  HELPER: {
+    id: 'helper',
+    name: 'Помощник',
+    description: 'Помогите 5 другим пользователям',
+    icon: '🤝',
+    points: 150,
+    type: 'social'
+  },
+  
+  // Уровневые достижения
+  LEVEL_5: {
+    id: 'level_5',
+    name: 'Опытный ученик',
+    description: 'Достигните 5 уровня',
+    icon: '📚',
+    points: 500,
+    type: 'level'
+  },
+  LEVEL_10: {
+    id: 'level_10',
+    name: 'Знаток',
+    description: 'Достигните 10 уровня',
+    icon: '🎓',
+    points: 1000,
+    type: 'level'
+  },
+  
+  // Специальные достижения
+  WEEKLY_CHAMPION: {
+    id: 'weekly_champion',
+    name: 'Чемпион недели',
+    description: 'Лучший результат недели',
+    icon: '🏆',
+    points: 750,
+    type: 'special'
+  },
+  
+  // Устаревшие достижения (для совместимости)
+  FIRST_STEPS: {
+    id: 'first_steps',
+    name: 'Первые шаги',
+    description: 'Ответьте на 10 вопросов',
+    icon: '👣',
+    points: 25,
+    type: 'legacy'
+  },
+  STREAK_MASTER: {
+    id: 'streak_master',
+    name: 'Мастер серий',
+    description: 'Достигните серии из 5 правильных ответов',
+    icon: '🔥',
+    points: 50,
+    type: 'legacy'
+  },
+  SCORE_100: {
+    id: 'score_100',
+    name: 'Сотня',
+    description: 'Наберите 100 очков',
+    icon: '💯',
+    points: 100,
+    type: 'legacy'
+  },
+  AI_MASTER: {
+    id: 'ai_master',
+    name: 'ИИ Мастер',
+    description: 'Задайте 10 вопросов ИИ',
+    icon: '🤖',
+    points: 75,
+    type: 'legacy'
+  },
+  CATEGORY_EXPERT: {
+    id: 'category_expert',
+    name: 'Эксперт категорий',
+    description: 'Изучите 8 категорий',
+    icon: '📚',
+    points: 150,
+    type: 'legacy'
+  },
+  CHAMPION: {
+    id: 'champion',
+    name: 'Чемпион',
+    description: 'Наберите 1000 очков',
+    icon: '🏆',
+    points: 500,
+    type: 'legacy'
+  }
+};
+
+// Система уровней
+export const LEVEL_SYSTEM = {
+  levels: [
+    { level: 1, name: 'Новичок', minExperience: 0, icon: '🌱', color: '#6B7280', rewards: { unlockFeatures: ['basic_tests'] } },
+    { level: 2, name: 'Ученик', minExperience: 100, icon: '📚', color: '#3B82F6', rewards: { unlockFeatures: ['daily_challenges'] } },
+    { level: 3, name: 'Знаток', minExperience: 300, icon: '🎓', color: '#10B981', rewards: { unlockFeatures: ['advanced_tests'] } },
+    { level: 4, name: 'Эксперт', minExperience: 600, icon: '🏆', color: '#F59E0B', rewards: { unlockFeatures: ['ai_consultations'] } },
+    { level: 5, name: 'Мастер', minExperience: 1000, icon: '👑', color: '#EF4444', rewards: { unlockFeatures: ['mentor_mode'] } },
+    { level: 6, name: 'Гуру', minExperience: 1500, icon: '🌟', color: '#8B5CF6', rewards: { unlockFeatures: ['custom_tests'] } },
+    { level: 7, name: 'Легенда', minExperience: 2500, icon: '💎', color: '#06B6D4', rewards: { unlockFeatures: ['all_features'] } }
+  ],
+  
+  getLevel(experience) {
+    return this.levels.reduce((current, level) => {
+      return experience >= level.minExperience ? level : current;
+    });
+  },
+  
+  getProgress(experience) {
+    const currentLevel = this.getLevel(experience);
+    const nextLevel = this.levels.find(l => l.minExperience > experience);
+    
+    if (!nextLevel) return 100;
+    
+    const currentLevelExp = currentLevel.minExperience;
+    const nextLevelExp = nextLevel.minExperience;
+    const userProgress = experience - currentLevelExp;
+    const levelRange = nextLevelExp - currentLevelExp;
+    
+    return Math.round((userProgress / levelRange) * 100);
+  },
+  
+  getNextLevel(experience) {
+    return this.levels.find(l => l.minExperience > experience);
+  }
+};
+
+// Система опыта
+export const EXPERIENCE_SYSTEM = {
+  rewards: {
+    test_completed: 10,
+    correct_answer: 5,
+    perfect_score: 50,
+    daily_streak: 25,
+    achievement_unlocked: 100,
+    helping_others: 15,
+    category_mastery: 200,
+    speed_bonus: 2,
+    weekend_bonus: 1.5
+  },
+  
+  multipliers: {
+    weekend: 1.5,
+    firstSessionOfDay: 2.0,
+    consecutiveDay: 1.1,
+    levelUp: 1.5
+  },
+  
+  calculateExperience(action, context = {}) {
+    let baseExp = this.rewards[action] || 0;
+    
+    // Применяем множители
+    if (context.isWeekend) baseExp *= this.multipliers.weekend;
+    if (context.isFirstSession) baseExp *= this.multipliers.firstSessionOfDay;
+    if (context.consecutiveDays > 1) {
+      baseExp *= Math.pow(this.multipliers.consecutiveDay, Math.min(context.consecutiveDays - 1, 7));
+    }
+    if (context.isLevelUp) baseExp *= this.multipliers.levelUp;
+    
+    return Math.round(baseExp);
+  }
+};
+
 export class DatabaseManager {
   constructor(env) {
     this.env = env;
     this.db = env.DB;
+    
+    console.log('[DatabaseManager] Constructor called');
+    console.log('[DatabaseManager] env:', env ? 'present' : 'missing');
+    console.log('[DatabaseManager] env.DB:', env?.DB ? 'present' : 'missing');
+    console.log('[DatabaseManager] this.db:', this.db ? 'present' : 'missing');
+    
+    // Добавляем подробное логирование всех свойств env
+    if (env) {
+      console.log('[DatabaseManager] env keys:', Object.keys(env));
+      console.log('[DatabaseManager] env.WINE_CACHE:', env.WINE_CACHE ? 'present' : 'missing');
+      console.log('[DatabaseManager] env.WORKER_URL:', env.WORKER_URL ? 'present' : 'missing');
+      console.log('[DatabaseManager] env.DB type:', typeof env.DB);
+      console.log('[DatabaseManager] env.DB constructor:', env.DB?.constructor?.name);
+    }
+  }
+
+  // Метод для прямого доступа к базе данных (для совместимости)
+  prepare(sql) {
+    console.log('[DatabaseManager] prepare called with sql:', sql.substring(0, 50) + '...');
+    console.log('[DatabaseManager] this.db:', this.db ? 'present' : 'missing');
+    
+    if (!this.db) {
+      console.error('[DatabaseManager] Database not available in prepare method');
+      throw new Error('Database not available');
+    }
+    
+    console.log('[DatabaseManager] Calling this.db.prepare...');
+    return this.db.prepare(sql);
   }
 
   // Инициализация пользователя
@@ -136,6 +384,111 @@ export class DatabaseManager {
       return result.meta.last_row_id;
     } catch (error) {
       console.error('Error creating learning session:', error);
+      return null;
+    }
+  }
+
+  // Создание сессии быстрого теста
+  async startQuickTestSession(chatId) {
+    try {
+      const result = await this.db.prepare(`
+        INSERT INTO learning_sessions (chat_id, session_type, start_time)
+        VALUES (?, 'quick_test', CURRENT_TIMESTAMP)
+      `).bind(chatId).run();
+
+      return {
+        id: result.meta.last_row_id,
+        sessionType: 'quick_test',
+        startTime: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('Error starting quick test session:', error);
+      return null;
+    }
+  }
+
+  // Получение вопроса для теста
+  async getTestQuestion(sessionId) {
+    try {
+      // Получаем информацию о сессии
+      const session = await this.db.prepare(`
+        SELECT chat_id, session_type FROM learning_sessions WHERE id = ?
+      `).bind(sessionId).first();
+
+      if (!session) {
+        return null;
+      }
+
+      // Генерируем простой вопрос (в реальной реализации здесь была бы логика генерации)
+      const question = {
+        id: `question_${Date.now()}`,
+        question: "Какой тип вина лучше всего сочетается с красным мясом?",
+        options: {
+          A: "Белое сухое вино",
+          B: "Красное сухое вино", 
+          C: "Розовое вино",
+          D: "Игристое вино"
+        },
+        correctAnswer: "B",
+        explanation: "Красное сухое вино традиционно сочетается с красным мясом благодаря танинам и структуре.",
+        category: "Вина",
+        difficulty: "beginner"
+      };
+
+      return question;
+    } catch (error) {
+      console.error('Error getting test question:', error);
+      return null;
+    }
+  }
+
+  // Отправка ответа на вопрос теста
+  async submitTestAnswer(sessionId, questionId, answer, isCorrect) {
+    try {
+      // Получаем информацию о сессии
+      const session = await this.db.prepare(`
+        SELECT chat_id, session_type FROM learning_sessions WHERE id = ?
+      `).bind(sessionId).first();
+
+      if (!session) {
+        return null;
+      }
+
+      // Сохраняем ответ
+      await this.db.prepare(`
+        INSERT INTO user_answers (
+          chat_id, session_id, question_text, user_answer, correct_answer,
+          is_correct, category, question_type, response_time_ms
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        session.chat_id, 
+        sessionId, 
+        `Question ${questionId}`, 
+        answer, 
+        isCorrect ? answer : 'unknown',
+        isCorrect ? 1 : 0, 
+        'General', 
+        'test_question',
+        Date.now()
+      ).run();
+
+      // Обновляем статистику сессии
+      const result = await this.db.prepare(`
+        UPDATE learning_sessions SET 
+          total_questions = total_questions + 1,
+          correct_answers = correct_answers + ?
+        WHERE id = ?
+      `).bind(isCorrect ? 1 : 0, sessionId).run();
+
+      return {
+        sessionId,
+        questionId,
+        answer,
+        isCorrect,
+        updated: true
+      };
+    } catch (error) {
+      console.error('Error submitting test answer:', error);
       return null;
     }
   }
@@ -355,11 +708,120 @@ export class DatabaseManager {
       const existingAchievements = await this.getAchievements(chatId);
       const existingTypes = existingAchievements.map(a => a.achievement_type);
 
+      // Получаем дополнительную статистику для проверки достижений
+      const categoryStats = await this.db.prepare(`
+        SELECT category, total_questions, correct_answers,
+               ROUND(CAST(correct_answers AS FLOAT) / total_questions * 100, 1) as accuracy
+        FROM category_stats 
+        WHERE chat_id = ?
+      `).bind(chatId).all();
+
+      const recentAnswers = await this.db.prepare(`
+        SELECT response_time_ms, is_correct
+        FROM user_answers 
+        WHERE chat_id = ? 
+        ORDER BY answered_at DESC 
+        LIMIT 10
+      `).bind(chatId).all();
+
       // Проверяем каждое достижение
       for (const [type, achievement] of Object.entries(ACHIEVEMENT_TYPES)) {
-        if (existingTypes.includes(type)) continue;
+        if (existingTypes.includes(achievement.id)) continue;
 
-        if (achievement.condition(stats)) {
+        let shouldAward = false;
+        let progressValue = 0;
+
+        switch (achievement.id) {
+          case 'first_test_completed':
+            shouldAward = (user.total_questions || 0) >= 1;
+            progressValue = user.total_questions || 0;
+            break;
+
+          case 'streak_3_days':
+            shouldAward = (user.consecutive_days || 0) >= 3;
+            progressValue = user.consecutive_days || 0;
+            break;
+
+          case 'streak_7_days':
+            shouldAward = (user.consecutive_days || 0) >= 7;
+            progressValue = user.consecutive_days || 0;
+            break;
+
+          case 'perfect_score':
+            // Проверяем последнюю сессию на 100% точность
+            const lastSession = await this.db.prepare(`
+              SELECT total_questions, correct_answers
+              FROM learning_sessions 
+              WHERE chat_id = ? AND end_time IS NOT NULL
+              ORDER BY end_time DESC 
+              LIMIT 1
+            `).bind(chatId).first();
+            
+            if (lastSession && lastSession.total_questions >= 5) {
+              const accuracy = (lastSession.correct_answers / lastSession.total_questions) * 100;
+              shouldAward = accuracy === 100;
+              progressValue = Math.round(accuracy);
+            }
+            break;
+
+          case 'speed_demon':
+            // Проверяем быстрые ответы (менее 10 секунд)
+            const fastAnswers = recentAnswers.results.filter(a => 
+              a.response_time_ms && a.response_time_ms < 10000 && a.is_correct
+            ).length;
+            shouldAward = fastAnswers >= 5;
+            progressValue = fastAnswers;
+            break;
+
+          case 'category_master':
+            // Проверяем мастерство в категориях (90%+ точность)
+            const masterCategories = categoryStats.results.filter(c => 
+              c.total_questions >= 10 && c.accuracy >= 90
+            ).length;
+            shouldAward = masterCategories >= 1;
+            progressValue = masterCategories;
+            break;
+
+          case 'level_5':
+            const currentLevel = LEVEL_SYSTEM.getLevel(user.experience_points || 0);
+            shouldAward = currentLevel.level >= 5;
+            progressValue = currentLevel.level;
+            break;
+
+          case 'level_10':
+            const userLevel = LEVEL_SYSTEM.getLevel(user.experience_points || 0);
+            shouldAward = userLevel.level >= 10;
+            progressValue = userLevel.level;
+            break;
+
+          // Устаревшие достижения для совместимости
+          case 'first_steps':
+            shouldAward = (user.total_questions || 0) >= 10;
+            progressValue = user.total_questions || 0;
+            break;
+
+          case 'streak_master':
+            shouldAward = (user.max_streak || 0) >= 5;
+            progressValue = user.max_streak || 0;
+            break;
+
+          case 'score_100':
+            shouldAward = (user.total_score || 0) >= 100;
+            progressValue = user.total_score || 0;
+            break;
+
+          case 'champion':
+            shouldAward = (user.total_score || 0) >= 1000;
+            progressValue = user.total_score || 0;
+            break;
+
+          default:
+            // Для остальных достижений используем базовую логику
+            shouldAward = false;
+            break;
+        }
+
+        if (shouldAward) {
           // Награждаем достижением
           await this.db.prepare(`
             INSERT INTO achievements (
@@ -367,14 +829,23 @@ export class DatabaseManager {
               progress_value, icon, points
             ) VALUES (?, ?, ?, ?, ?, ?, ?)
           `).bind(
-            chatId, type, achievement.name, achievement.description,
-            stats.totalQuestions, achievement.icon, achievement.points
+            chatId, achievement.id, achievement.name, achievement.description,
+            progressValue, achievement.icon, achievement.points
           ).run();
 
           // Добавляем очки опыта
           await this.updateUserStats(chatId, {
             experiencePoints: achievement.points
           });
+
+          // Логируем активность
+          await this.logActivity(
+            chatId, 
+            'achievement_unlocked', 
+            `Получено достижение: ${achievement.name}`,
+            achievement.points,
+            achievement.points
+          );
 
           newAchievements.push(achievement);
         }
@@ -437,152 +908,220 @@ export class DatabaseManager {
       return null;
     }
   }
-}
 
-// Константы достижений (будут использоваться в системе достижений)
-export const ACHIEVEMENT_TYPES = {
-  FIRST_STEPS: {
-    id: 'first_steps',
-    name: 'Первые шаги',
-    description: 'Ответьте на 10 вопросов',
-    condition: (stats) => stats.totalQuestions >= 10,
-    icon: '🎯',
-    points: 10
-  },
-  
-  STREAK_MASTER: {
-    id: 'streak_master',
-    name: 'Серия побед',
-    description: '5 правильных ответов подряд',
-    condition: (stats) => stats.maxStreak >= 5,
-    icon: '🔥',
-    points: 25
-  },
-  
-  SCORE_100: {
-    id: 'score_100',
-    name: 'Стобалльник',
-    description: 'Заработайте 100 баллов',
-    condition: (stats) => stats.totalScore >= 100,
-    icon: '💎',
-    points: 50
-  },
-  
-  AI_MASTER: {
-    id: 'ai_master',
-    name: 'ИИ-мастер',
-    description: 'Пройдите 10 ИИ-вопросов',
-    condition: (stats) => stats.aiQuestions >= 10,
-    icon: '🤖',
-    points: 75
-  },
-  
-  CATEGORY_EXPERT: {
-    id: 'category_expert',
-    name: 'Категорийный эксперт',
-    description: 'Изучите все категории',
-    condition: (stats) => stats.categoriesStudied >= 8,
-    icon: '📚',
-    points: 100
-  },
-  
-  CHAMPION: {
-    id: 'champion',
-    name: 'Чемпион',
-    description: 'Заработайте 1000 баллов',
-    condition: (stats) => stats.totalScore >= 1000,
-    icon: '🏆',
-    points: 200
-  },
-  
-  // Новые достижения
-  PERFECT_ACCURACY: {
-    id: 'perfect_accuracy',
-    name: 'Точность 100%',
-    description: 'Пройдите тест с идеальной точностью (минимум 5 вопросов)',
-    condition: (stats) => stats.accuracy >= 100 && stats.totalQuestions >= 5,
-    icon: '🎯',
-    points: 150
-  },
-  
-  DAILY_WARRIOR: {
-    id: 'daily_warrior',
-    name: 'Ежедневный воин',
-    description: 'Выполните 7 ежедневных заданий подряд',
-    condition: (stats) => stats.consecutiveDays >= 7,
-    icon: '📅',
-    points: 100
-  },
-  
-  SPEED_DEMON: {
-    id: 'speed_demon',
-    name: 'Скоростной демон',
-    description: 'Ответьте на 10 вопросов быстрее чем за 2 минуты',
-    condition: (stats) => stats.fastAnswers >= 10,
-    icon: '⚡',
-    points: 75
-  },
-  
-  KNOWLEDGE_SEEKER: {
-    id: 'knowledge_seeker',
-    name: 'Искатель знаний',
-    description: 'Изучите 50 разных напитков',
-    condition: (stats) => stats.uniqueWines >= 50,
-    icon: '🔍',
-    points: 125
-  },
-  
-  WEEKEND_LEARNER: {
-    id: 'weekend_learner',
-    name: 'Выходной ученик',
-    description: 'Занимайтесь в течение 4 выходных подряд',
-    condition: (stats) => stats.weekendSessions >= 4,
-    icon: '🌅',
-    points: 80
-  },
-  
-  MORNING_PERSON: {
-    id: 'morning_person',
-    name: 'Ранняя пташка',
-    description: 'Занимайтесь 5 раз до 9 утра',
-    condition: (stats) => stats.morningSessions >= 5,
-    icon: '🌅',
-    points: 60
-  },
-  
-  NIGHT_OWL: {
-    id: 'night_owl',
-    name: 'Ночная сова',
-    description: 'Занимайтесь 5 раз после 22:00',
-    condition: (stats) => stats.nightSessions >= 5,
-    icon: '🦉',
-    points: 60
-  },
-  
-  SOCIAL_BUTTERFLY: {
-    id: 'social_butterfly',
-    name: 'Социальная бабочка',
-    description: 'Поделитесь результатами 3 раза',
-    condition: (stats) => stats.sharedResults >= 3,
-    icon: '🦋',
-    points: 40
-  },
-  
-  CONSISTENCY_KING: {
-    id: 'consistency_king',
-    name: 'Король постоянства',
-    description: 'Занимайтесь 30 дней подряд',
-    condition: (stats) => stats.consecutiveDays >= 30,
-    icon: '👑',
-    points: 300
-  },
-  
-  EXPLORER: {
-    id: 'explorer',
-    name: 'Исследователь',
-    description: 'Попробуйте все типы вопросов',
-    condition: (stats) => stats.questionTypes >= 8,
-    icon: '🗺️',
-    points: 90
+  // Получение информации об уровне пользователя
+  async getUserLevel(chatId) {
+    try {
+      const user = await this.getUser(chatId);
+      if (!user) return null;
+
+      const currentLevel = LEVEL_SYSTEM.getLevel(user.experience_points || 0);
+      const progress = LEVEL_SYSTEM.getProgress(user.experience_points || 0);
+      const nextLevel = LEVEL_SYSTEM.getNextLevel(user.experience_points || 0);
+
+      return {
+        currentLevel,
+        progress,
+        nextLevel,
+        experiencePoints: user.experience_points || 0
+      };
+    } catch (error) {
+      console.error('Error getting user level:', error);
+      return null;
+    }
   }
-}; 
+
+  // Добавление опыта пользователю
+  async addExperience(chatId, action, context = {}) {
+    try {
+      const experienceGained = EXPERIENCE_SYSTEM.calculateExperience(action, context);
+      
+      if (experienceGained > 0) {
+        const user = await this.getUser(chatId);
+        const oldExperience = user.experience_points || 0;
+        const newExperience = oldExperience + experienceGained;
+
+        await this.updateUserStats(chatId, {
+          experiencePoints: experienceGained
+        });
+
+        // Проверяем повышение уровня
+        const oldLevel = LEVEL_SYSTEM.getLevel(oldExperience);
+        const newLevel = LEVEL_SYSTEM.getLevel(newExperience);
+
+        if (newLevel.level > oldLevel.level) {
+          // Логируем повышение уровня
+          await this.logActivity(
+            chatId,
+            'level_up',
+            `Повышение уровня: ${oldLevel.name} → ${newLevel.name}`,
+            newLevel.level * 50,
+            newLevel.level * 25
+          );
+
+          return {
+            levelUp: true,
+            oldLevel,
+            newLevel,
+            experienceGained
+          };
+        }
+
+        return {
+          levelUp: false,
+          experienceGained
+        };
+      }
+
+      return { levelUp: false, experienceGained: 0 };
+    } catch (error) {
+      console.error('Error adding experience:', error);
+      return { levelUp: false, experienceGained: 0 };
+    }
+  }
+
+  // Получение прогресса по достижениям
+  async getAchievementProgress(chatId) {
+    try {
+      const user = await this.getUser(chatId);
+      if (!user) return [];
+
+      const achievements = await this.getAchievements(chatId);
+      const unlockedTypes = achievements.map(a => a.achievement_type);
+
+      const progress = [];
+      
+      for (const [type, achievement] of Object.entries(ACHIEVEMENT_TYPES)) {
+        const isUnlocked = unlockedTypes.includes(achievement.id);
+        const currentValue = this.getCurrentProgressValue(achievement.id, user);
+        const targetValue = this.getTargetValue(achievement.id);
+        const progressPercent = Math.min(Math.round((currentValue / targetValue) * 100), 100);
+
+        progress.push({
+          type,
+          achievement,
+          isUnlocked,
+          currentValue,
+          targetValue,
+          progressPercent
+        });
+      }
+
+      return progress;
+    } catch (error) {
+      console.error('Error getting achievement progress:', error);
+      return [];
+    }
+  }
+
+  // Получение текущего значения прогресса для достижения
+  getCurrentProgressValue(achievementId, user) {
+    switch (achievementId) {
+      case 'first_test_completed':
+        return user.total_questions || 0;
+      case 'streak_3_days':
+      case 'streak_7_days':
+        return user.consecutive_days || 0;
+      case 'perfect_score':
+        return 0; // Будет вычисляться динамически
+      case 'speed_demon':
+        return 0; // Будет вычисляться динамически
+      case 'category_master':
+        return 0; // Будет вычисляться динамически
+      case 'level_5':
+      case 'level_10':
+        const currentLevel = LEVEL_SYSTEM.getLevel(user.experience_points || 0);
+        return currentLevel.level;
+      case 'first_steps':
+        return user.total_questions || 0;
+      case 'streak_master':
+        return user.max_streak || 0;
+      case 'score_100':
+      case 'champion':
+        return user.total_score || 0;
+      default:
+        return 0;
+    }
+  }
+
+  // Получение целевого значения для достижения
+  getTargetValue(achievementId) {
+    switch (achievementId) {
+      case 'first_test_completed':
+        return 1;
+      case 'streak_3_days':
+        return 3;
+      case 'streak_7_days':
+        return 7;
+      case 'perfect_score':
+        return 100;
+      case 'speed_demon':
+        return 5;
+      case 'category_master':
+        return 1;
+      case 'level_5':
+        return 5;
+      case 'level_10':
+        return 10;
+      case 'first_steps':
+        return 10;
+      case 'streak_master':
+        return 5;
+      case 'score_100':
+        return 100;
+      case 'champion':
+        return 1000;
+      default:
+        return 1;
+    }
+  }
+
+  // Получить все chatId пользователей для рассылки напоминаний
+  async getAllUserChatIds() {
+    if (!this.db) {
+      console.error('[DatabaseManager] Database not available in getAllUserChatIds');
+      return [];
+    }
+    const result = await this.db.prepare(`
+      SELECT 
+        chat_id as chatId,
+        last_learning_date as lastLearningDate,
+        last_activity as lastActiveDate
+      FROM users
+    `).all();
+    return result.results || [];
+  }
+
+  // Получить время последней мотивации
+  async getLastMotivationSent(chatId) {
+    if (!this.db) return null;
+    const result = await this.db.prepare('SELECT last_motivation_sent FROM users WHERE chat_id = ?').bind(chatId).first();
+    return result?.last_motivation_sent || null;
+  }
+
+  // Обновить время последней мотивации
+  async updateLastMotivationSent(chatId, date) {
+    if (!this.db) return false;
+    await this.db.prepare('UPDATE users SET last_motivation_sent = ? WHERE chat_id = ?').bind(date.toISOString(), chatId).run();
+    return true;
+  }
+
+  // Получить последние достижения пользователя
+  async getRecentAchievements(chatId, limit = 3) {
+    if (!this.db) return [];
+    const result = await this.db.prepare('SELECT achievement_name FROM achievements WHERE chat_id = ? ORDER BY unlocked_at DESC LIMIT ?').bind(chatId, limit).all();
+    return result.results?.map(r => r.achievement_name) || [];
+  }
+
+  // Получить динамику прогресса за последнюю неделю
+  async getProgressDynamics(chatId) {
+    if (!this.db) return 0;
+    // Получаем XP неделю назад и сейчас
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const xpWeekAgoResult = await this.db.prepare('SELECT experience_points FROM users WHERE chat_id = ? AND last_activity <= ? ORDER BY last_activity DESC LIMIT 1').bind(chatId, weekAgo).first();
+    const xpNowResult = await this.db.prepare('SELECT experience_points FROM users WHERE chat_id = ?').bind(chatId).first();
+    const xpWeekAgo = xpWeekAgoResult?.experience_points || 0;
+    const xpNow = xpNowResult?.experience_points || 0;
+    return xpNow - xpWeekAgo;
+  }
+} 

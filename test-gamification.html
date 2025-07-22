@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест системы геймификации</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .api-test {
+            background: #f0f8ff;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .success { border-left-color: #28a745; }
+        .error { border-left-color: #dc3545; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Тест системы геймификации</h1>
+    
+    <div class="test-section">
+        <h2>1. Проверка API эндпоинтов</h2>
+        
+        <div class="api-test">
+            <h3>Проверка здоровья сервера</h3>
+            <button onclick="testHealth()">Тест /health</button>
+            <div id="health-result" class="result"></div>
+        </div>
+
+        <div class="api-test">
+            <h3>Получение статистики пользователя</h3>
+            <input type="number" id="chatId" placeholder="Chat ID" value="123456789" style="padding: 5px; margin: 5px;">
+            <button onclick="testUserStats()">Тест /user-stats</button>
+            <div id="stats-result" class="result"></div>
+        </div>
+
+        <div class="api-test">
+            <h3>Получение уровня пользователя</h3>
+            <button onclick="testUserLevel()">Тест /user/level</button>
+            <div id="level-result" class="result"></div>
+        </div>
+
+        <div class="api-test">
+            <h3>Получение достижений</h3>
+            <button onclick="testAchievements()">Тест /achievements/user</button>
+            <div id="achievements-result" class="result"></div>
+        </div>
+
+        <div class="api-test">
+            <h3>Получение ежедневных заданий</h3>
+            <button onclick="testDailyChallenges()">Тест /daily-challenges/user</button>
+            <div id="challenges-result" class="result"></div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. Тестирование действий</h2>
+        
+        <div class="api-test">
+            <h3>Добавление опыта</h3>
+            <button onclick="testAddExperience()">Добавить опыт</button>
+            <div id="experience-result" class="result"></div>
+        </div>
+
+        <div class="api-test">
+            <h3>Проверка достижений</h3>
+            <button onclick="testCheckAchievements()">Проверить достижения</button>
+            <div id="check-achievements-result" class="result"></div>
+        </div>
+
+        <div class="api-test">
+            <h3>Логирование действия</h3>
+            <button onclick="testLogAction()">Записать действие</button>
+            <div id="log-action-result" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://telegram-wine-bot.2gc.workers.dev';
+        
+        function getChatId() {
+            return document.getElementById('chatId').value || '123456789';
+        }
+
+        function showResult(elementId, data, isError = false) {
+            const element = document.getElementById(elementId);
+            element.textContent = JSON.stringify(data, null, 2);
+            element.className = `result ${isError ? 'error' : 'success'}`;
+        }
+
+        async function testHealth() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                showResult('health-result', data);
+            } catch (error) {
+                showResult('health-result', { error: error.message }, true);
+            }
+        }
+
+        async function testUserStats() {
+            try {
+                const chatId = getChatId();
+                const response = await fetch(`${API_BASE}/user-stats?chatId=${chatId}`);
+                const data = await response.json();
+                showResult('stats-result', data);
+            } catch (error) {
+                showResult('stats-result', { error: error.message }, true);
+            }
+        }
+
+        async function testUserLevel() {
+            try {
+                const chatId = getChatId();
+                const response = await fetch(`${API_BASE}/user/level?chatId=${chatId}`);
+                const data = await response.json();
+                showResult('level-result', data);
+            } catch (error) {
+                showResult('level-result', { error: error.message }, true);
+            }
+        }
+
+        async function testAchievements() {
+            try {
+                const chatId = getChatId();
+                const response = await fetch(`${API_BASE}/achievements/user?chatId=${chatId}`);
+                const data = await response.json();
+                showResult('achievements-result', data);
+            } catch (error) {
+                showResult('achievements-result', { error: error.message }, true);
+            }
+        }
+
+        async function testDailyChallenges() {
+            try {
+                const chatId = getChatId();
+                const response = await fetch(`${API_BASE}/daily-challenges/user?chatId=${chatId}`);
+                const data = await response.json();
+                showResult('challenges-result', data);
+            } catch (error) {
+                showResult('challenges-result', { error: error.message }, true);
+            }
+        }
+
+        async function testAddExperience() {
+            try {
+                const chatId = getChatId();
+                const response = await fetch(`${API_BASE}/user/experience/add`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        chatId: chatId,
+                        action: 'test_completed',
+                        context: {
+                            questionsCount: 5,
+                            accuracy: 80,
+                            timeSpent: 120
+                        }
+                    })
+                });
+                const data = await response.json();
+                showResult('experience-result', data);
+            } catch (error) {
+                showResult('experience-result', { error: error.message }, true);
+            }
+        }
+
+        async function testCheckAchievements() {
+            try {
+                const chatId = getChatId();
+                const response = await fetch(`${API_BASE}/achievements/check`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        chatId: chatId,
+                        stats: {
+                            totalQuestions: 25,
+                            accuracy: 85,
+                            score: 450,
+                            timeSpent: 600
+                        }
+                    })
+                });
+                const data = await response.json();
+                showResult('check-achievements-result', data);
+            } catch (error) {
+                showResult('check-achievements-result', { error: error.message }, true);
+            }
+        }
+
+        async function testLogAction() {
+            try {
+                const chatId = getChatId();
+                const response = await fetch(`${API_BASE}/analytics/action`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        chatId: chatId,
+                        actionType: 'test_action',
+                        description: 'Тестовое действие',
+                        pointsEarned: 10,
+                        experienceEarned: 5
+                    })
+                });
+                const data = await response.json();
+                showResult('log-action-result', data);
+            } catch (error) {
+                showResult('log-action-result', { error: error.message }, true);
+            }
+        }
+
+        // Автоматически тестируем здоровье сервера при загрузке
+        window.onload = function() {
+            testHealth();
+        };
+    </script>
+</body>
+</html> 

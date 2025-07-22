@@ -52,12 +52,12 @@ class LearningState {
 }
 
 // Генерация вопроса с помощью ИИ
-async function generateAIQuestion(wines, questionType, difficulty, env) {
+async function generateAIQuestion(wines, questionType, difficulty, env, userContext = {}) {
   const randomWine = wines[Math.floor(Math.random() * wines.length)];
-  
-  let prompt = `Ты эксперт-сомелье, который создает обучающие вопросы для официантов ресторана.
 
-Создай один вопрос с 4 вариантами ответа (только один правильный) для обучения официанта.
+  let prompt = `Ты эксперт-сомелье, который создаёт обучающие вопросы для официантов ресторана.
+
+Создай ОДИН вопрос с 4 вариантами ответа (только один правильный) для обучения официанта.
 
 Информация о напитке:
 Название: ${randomWine.name}
@@ -73,7 +73,7 @@ ${randomWine.ingredients ? `Состав: ${randomWine.ingredients}` : ''}
 Тип вопроса: ${questionType}
 Сложность: ${difficulty}
 
-Формат ответа (строго):
+Формат ответа (СТРОГО!):
 ВОПРОС: [вопрос]
 A) [вариант A]
 B) [вариант B]
@@ -82,18 +82,34 @@ D) [вариант D]
 ПРАВИЛЬНЫЙ: [буква правильного ответа]
 ОБЪЯСНЕНИЕ: [краткое объяснение почему это правильный ответ]
 
-Сделай вопрос интересным и практичным для официанта.`;
+Пример:
+ВОПРОС: Какой основной сорт винограда используется в вине X?
+A) Каберне Совиньон
+B) Мерло
+C) Шардоне
+D) Пино Нуар
+ПРАВИЛЬНЫЙ: C
+ОБЪЯСНЕНИЕ: В вине X используется сорт Шардоне.
+
+Не добавляй никаких пояснений, только строго по формату!`;
+
+  // Добавим персонализацию, если есть userContext
+  if (userContext && userContext.difficulty) {
+    prompt += `\n\nУровень знаний пользователя: ${userContext.difficulty}`;
+  }
+  if (userContext && userContext.preferences) {
+    prompt += `\n\nПредпочтения пользователя: ${userContext.preferences.join(', ')}`;
+  }
 
   try {
     const aiResponse = await askCloudflareAI(prompt, env);
-    
-    // Парсим ответ ИИ
-    const lines = aiResponse.split('\n');
+    // Фильтрация лишнего текста (например, "Конечно, вот ваш вопрос:")
+    const cleanResponse = aiResponse.replace(/^(Конечно, вот ваш вопрос:|Вот ваш вопрос:|Вопрос:|Q:)/i, '').trim();
+    const lines = cleanResponse.split('\n');
     let question = '';
     let options = {};
     let correctAnswer = '';
     let explanation = '';
-    
     for (let line of lines) {
       line = line.trim();
       if (line.startsWith('ВОПРОС:')) {
@@ -112,7 +128,6 @@ D) [вариант D]
         explanation = line.replace('ОБЪЯСНЕНИЕ:', '').trim();
       }
     }
-    
     if (question && Object.keys(options).length === 4 && correctAnswer && explanation) {
       return {
         question,
@@ -126,8 +141,7 @@ D) [вариант D]
   } catch (error) {
     console.error('Error generating AI question:', error);
   }
-  
-  // Fallback - создаем простой вопрос
+  // Fallback - создаём простой вопрос
   return generateFallbackQuestion(randomWine, questionType);
 }
 

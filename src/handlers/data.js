@@ -12,37 +12,37 @@ const SHEET_CONFIG = {
   304728120: {
     name: 'Вина',
     category: 'Вина',
-    columns: ['name', 'sugar', 'alcohol', 'country', 'description']
+    columns: ['Название', 'Сахар', 'Крепость', 'Страна', 'Описание']
   },
   // Граппа, Порто, Коньяк, Вермут
   475136119: {
     name: 'Граппа, Порто, Коньяк, Вермут',
     category: 'Граппа, Порто, Коньяк, Вермут',
-    columns: ['name', 'sugar', 'alcohol', 'country', 'description']
+    columns: ['Название', 'Сахар', 'Крепость', 'Страна', 'Описание']
   },
   // Виски
   1464137901: {
     name: 'Виски',
     category: 'Виски',
-    columns: ['name', 'country', 'alcohol', 'type', 'aging', 'description']
+    columns: ['Название', 'Страна', 'Крепость', 'Тип', 'Выдержка', 'Описание']
   },
   // Ром, Текила
   622932265: {
     name: 'Ром, Текила',
     category: 'Ром, Текила',
-    columns: ['name', 'sugar', 'alcohol', 'country', 'description']
+    columns: ['Название', 'Сахар', 'Крепость', 'Страна', 'Описание']
   },
   // Джин, Водка, Ликеры
   1353666556: {
     name: 'Джин, Водка, Ликеры',
     category: 'Джин, Водка, Ликеры',
-    columns: ['name', 'sugar', 'alcohol', 'country', 'description']
+    columns: ['Название', 'Сахар', 'Крепость', 'Страна', 'Описание']
   },
   // Пиво
   1693795279: {
     name: 'Пиво',
     category: 'Пиво',
-    columns: ['name', 'country', 'density', 'alcohol', 'description']
+    columns: ['Название', 'Страна', 'Плотность', 'Крепость', 'Описание']
   }
 };
 
@@ -52,49 +52,49 @@ const COCKTAIL_SHEET_CONFIG = {
   933733242: {
     name: 'Коктейли',
     category: 'Коктейли',
-    columns: ['name', 'method', 'glassware', 'ice', 'ingredients']
+    columns: ['Название', 'Метод', 'Посуда', 'Лед', 'Состав']
   },
   // Микс дринк
   333534132: {
     name: 'Микс дринк',
     category: 'Микс дринк',
-    columns: ['name', 'method', 'glassware', 'ice', 'ingredients']
+    columns: ['Название', 'Метод', 'Посуда', 'Лед', 'Состав']
   },
   // Лимонады и Милкшейки
   960984055: {
     name: 'Лимонады и Милкшейки',
     category: 'Лимонады и Милкшейки',
-    columns: ['name', 'method', 'glassware', 'ice', 'ingredients']
+    columns: ['Название', 'Метод', 'Посуда', 'Лед', 'Состав']
   },
   // Чай
   757868796: {
     name: 'Чай',
     category: 'Чай',
-    columns: ['name', 'ingredients', 'method']
+    columns: ['Название', 'Состав', 'Метод']
   },
   // Кофе
   1558262156: {
     name: 'Кофе',
     category: 'Кофе',
-    columns: ['name', 'method', 'glassware', 'ice', 'ingredients']
+    columns: ['Название', 'Метод', 'Посуда', 'Лед', 'Состав']
   },
   // Премиксы
   488095192: {
     name: 'Премиксы',
     category: 'Премиксы',
-    columns: ['name', 'ingredients']
+    columns: ['Название', 'Состав']
   },
   // ПФ
   267708529: {
     name: 'ПФ',
     category: 'ПФ',
-    columns: ['category', 'name', 'ingredients', 'description']
+    columns: ['Категория', 'Название', 'Состав', 'Описание']
   },
   // нет в меню
   118586886: {
     name: 'нет в меню',
     category: 'нет в меню',
-    columns: ['category', 'name', 'method', 'glassware', 'ice', 'ingredients']
+    columns: ['Категория', 'Название', 'Метод', 'Посуда', 'Лед', 'Состав']
   }
 };
 
@@ -244,25 +244,25 @@ export async function loadWinesFromGoogleSheets(env) {
           // Заполняем поля в зависимости от структуры листа
           if (config.category === 'Виски') {
             // Виски: Название, Страна, Крепость, Тип, Выдержка, Описание
-            wine.country = row[columnMapping.country] || '';
-            wine.alcohol = row[columnMapping.alcohol] || '';
-            wine.type = row[columnMapping.type] || '';
-            wine.aging = row[columnMapping.aging] || '';
-            wine.description = row[columnMapping.description] || '';
+            wine.country = row[columnMapping.Страна] || '';
+            wine.alcohol = row[columnMapping.Крепость] || '';
+            wine.type = row[columnMapping.Тип] || '';
+            wine.aging = row[columnMapping.Выдержка] || '';
+            wine.description = row[columnMapping.Описание] || '';
             wine.sugar = 'Сухой'; // Для виски всегда сухой
           } else if (config.category === 'Пиво') {
             // Пиво: Название Пива, Страна, Плотность, Крепость, Описание
-            wine.country = row[columnMapping.country] || '';
-            wine.density = row[columnMapping.density] || '';
-            wine.alcohol = row[columnMapping.alcohol] || '';
-            wine.description = row[columnMapping.description] || '';
+            wine.country = row[columnMapping.Страна] || '';
+            wine.density = row[columnMapping.Плотность] || '';
+            wine.alcohol = row[columnMapping.Крепость] || '';
+            wine.description = row[columnMapping.Описание] || '';
             wine.sugar = 'Сухое'; // Для пива всегда сухое
           } else {
             // Остальные категории: Название, Сахар, Крепость, Страна, Описание
-            wine.sugar = row[columnMapping.sugar] || '';
-            wine.alcohol = row[columnMapping.alcohol] || '';
-            wine.country = row[columnMapping.country] || '';
-            wine.description = row[columnMapping.description] || '';
+            wine.sugar = row[columnMapping.Сахар] || '';
+            wine.alcohol = row[columnMapping.Крепость] || '';
+            wine.country = row[columnMapping.Страна] || '';
+            wine.description = row[columnMapping.Описание] || '';
           }
           
           // Добавляем вино только если есть название
@@ -340,32 +340,32 @@ export async function loadWinesFromGoogleSheets(env) {
           // Заполняем поля в зависимости от структуры листа
           if (config.category === 'Чай') {
             // Чай: Название, Состав, Метод
-            drink.ingredients = row[columnMapping.ingredients] || '';
-            drink.method = row[columnMapping.method] || '';
+            drink.ingredients = row[columnMapping.Состав] || '';
+            drink.method = row[columnMapping.Метод] || '';
             drink.description = `Чай: ${drink.ingredients}. Способ приготовления: ${drink.method}`;
           } else if (config.category === 'Премиксы') {
             // Премиксы: название, состав
-            drink.ingredients = row[columnMapping.ingredients] || '';
+            drink.ingredients = row[columnMapping.Состав] || '';
             drink.description = `Премикс: ${drink.ingredients}`;
           } else if (config.category === 'ПФ') {
             // ПФ: Категория, Название, Состав, Описание
-            drink.subcategory = row[columnMapping.category] || '';
-            drink.ingredients = row[columnMapping.ingredients] || '';
-            drink.description = row[columnMapping.description] || '';
+            drink.subcategory = row[columnMapping.Категория] || '';
+            drink.ingredients = row[columnMapping.Состав] || '';
+            drink.description = row[columnMapping.Описание] || '';
           } else if (config.category === 'нет в меню') {
             // нет в меню: Категория, Название, Метод, Посуда, Лед, Состав
-            drink.subcategory = row[columnMapping.category] || '';
-            drink.method = row[columnMapping.method] || '';
-            drink.glassware = row[columnMapping.glassware] || '';
-            drink.ice = row[columnMapping.ice] || '';
-            drink.ingredients = row[columnMapping.ingredients] || '';
+            drink.subcategory = row[columnMapping.Категория] || '';
+            drink.method = row[columnMapping.Метод] || '';
+            drink.glassware = row[columnMapping.Посуда] || '';
+            drink.ice = row[columnMapping.Лед] || '';
+            drink.ingredients = row[columnMapping.Состав] || '';
             drink.description = `${drink.subcategory}: ${drink.ingredients}. Метод: ${drink.method}. Посуда: ${drink.glassware}. Лед: ${drink.ice}`;
           } else {
             // Остальные категории: Название, Метод, Посуда, Лед, Состав
-            drink.method = row[columnMapping.method] || '';
-            drink.glassware = row[columnMapping.glassware] || '';
-            drink.ice = row[columnMapping.ice] || '';
-            drink.ingredients = row[columnMapping.ingredients] || '';
+            drink.method = row[columnMapping.Метод] || '';
+            drink.glassware = row[columnMapping.Посуда] || '';
+            drink.ice = row[columnMapping.Лед] || '';
+            drink.ingredients = row[columnMapping.Состав] || '';
             drink.description = `${drink.category}: ${drink.ingredients}. Метод: ${drink.method}. Посуда: ${drink.glassware}. Лед: ${drink.ice}`;
           }
           

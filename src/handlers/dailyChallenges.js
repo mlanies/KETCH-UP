@@ -1,6 +1,72 @@
 // Система ежедневных заданий
-import { DatabaseManager } from './database.js';
-import { sendMessage, sendMessageWithKeyboard } from './telegramApi.js';
+import { DatabaseManager, EXPERIENCE_SYSTEM } from './database.js';
+import { sendMessage } from './telegramApi.js';
+
+// Типы ежедневных заданий
+export const DAILY_CHALLENGE_TYPES = {
+  COMPLETE_TESTS: {
+    id: 'complete_3_tests',
+    name: 'Три теста в день',
+    description: 'Пройдите 3 теста за сегодня',
+    target: 3,
+    reward: { experience: 50, points: 25 },
+    type: 'completion'
+  },
+  
+  HIGH_ACCURACY: {
+    id: 'high_accuracy',
+    name: 'Точность',
+    description: 'Получите 80%+ правильных ответов',
+    target: 0.8,
+    reward: { experience: 75, points: 40 },
+    type: 'quality'
+  },
+  
+  NEW_CATEGORY: {
+    id: 'new_category',
+    name: 'Новая категория',
+    description: 'Изучите новую категорию напитков',
+    target: 1,
+    reward: { experience: 100, points: 50 },
+    type: 'exploration'
+  },
+  
+  FAST_RESPONSES: {
+    id: 'fast_responses',
+    name: 'Быстрые ответы',
+    description: 'Ответьте на 5 вопросов быстрее 15 секунд',
+    target: 5,
+    reward: { experience: 60, points: 30 },
+    type: 'speed'
+  },
+  
+  PERFECT_SESSION: {
+    id: 'perfect_session',
+    name: 'Идеальная сессия',
+    description: 'Пройдите тест с 100% точностью (минимум 5 вопросов)',
+    target: 1,
+    reward: { experience: 150, points: 75 },
+    type: 'perfection'
+  },
+  
+  STREAK_MAINTAIN: {
+    id: 'streak_maintain',
+    name: 'Поддержание серии',
+    description: 'Поддерживайте серию правильных ответов 5 раз подряд',
+    target: 5,
+    reward: { experience: 80, points: 40 },
+    type: 'streak'
+  },
+  
+  LEARNING_TIME: {
+    id: 'learning_time',
+    name: 'Время обучения',
+    description: 'Проведите в обучении минимум 10 минут',
+    target: 600, // в секундах
+    reward: { experience: 90, points: 45 },
+    type: 'time'
+  }
+};
 
 export class DailyChallengeSystem {
   constructor(database, env) {
@@ -8,179 +74,134 @@ export class DailyChallengeSystem {
     this.env = env;
   }
 
-  // Типы ежедневных заданий
-  static CHALLENGE_TYPES = {
-    DAILY_QUESTIONS: {
-      id: 'daily_questions',
-      name: 'Ежедневные вопросы',
-      description: 'Ответьте на 5 вопросов сегодня',
-      target: 5,
-      reward: { points: 20, experience: 10 }
-    },
-    DAILY_STREAK: {
-      id: 'daily_streak',
-      name: 'Серия дня',
-      description: 'Получите серию из 3 правильных ответов',
-      target: 3,
-      reward: { points: 15, experience: 8 }
-    },
-    DAILY_CATEGORY: {
-      id: 'daily_category',
-      name: 'Категория дня',
-      description: 'Изучите категорию "Вина"',
-      target: 'Вина',
-      reward: { points: 25, experience: 12 }
-    },
-    DAILY_ACCURACY: {
-      id: 'daily_accuracy',
-      name: 'Точность дня',
-      description: 'Достигните 80% точности в тесте из 5+ вопросов',
-      target: 80,
-      reward: { points: 30, experience: 15 }
-    },
-    DAILY_AI: {
-      id: 'daily_ai',
-      name: 'ИИ-задание',
-      description: 'Пройдите 3 ИИ-вопроса',
-      target: 3,
-      reward: { points: 35, experience: 18 }
-    }
-  };
-
-  // Генерация ежедневного задания
-  async generateDailyChallenge(chatId) {
+  // Генерация ежедневных заданий для пользователя
+  async generateDailyChallenges(chatId) {
     try {
-      console.log('=== generateDailyChallenge START ===');
-      console.log('chatId:', chatId);
-      
-      const today = new Date().toDateString();
-      console.log('Today:', today);
-      
-      const challengeType = this.getRandomChallengeType();
-      console.log('Selected challenge type:', challengeType);
-      
-      const challengeId = `${challengeType.id}_${today}`;
-      console.log('Generated challenge ID:', challengeId);
-      
-      // Проверяем, не существует ли уже задание на сегодня
-      const checkQuery = `
-        SELECT id FROM daily_challenges 
-        WHERE chat_id = ? AND challenge_id = ? AND created_date = CURRENT_DATE
-      `;
-      console.log('Checking existing challenge with query:', checkQuery);
-      
-      const existing = await this.database.db.prepare(checkQuery).bind(chatId, challengeId).first();
-      console.log('Existing challenge check result:', existing);
+      const user = await this.database.getUser(chatId);
+      if (!user) return [];
 
-      if (existing) {
-        console.log('Challenge already exists, skipping generation');
-        return null; // Задание уже существует
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Проверяем, есть ли уже задания на сегодня
+      const existingChallenges = await this.database.prepare(`
+        SELECT challenge_id FROM daily_challenges 
+        WHERE chat_id = ? AND created_date = ?
+      `).bind(chatId, today).all();
+
+      if (existingChallenges.results.length > 0) {
+        return await this.getUserDailyChallenges(chatId);
       }
 
-      // Создаем новое задание
-      const insertQuery = `
-        INSERT INTO daily_challenges (
-          chat_id, challenge_id, challenge_type, challenge_name, 
-          description, target_value, reward_points, reward_experience
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `;
+      // Выбираем случайные задания (3-5 штук)
+      const challengeTypes = Object.values(DAILY_CHALLENGE_TYPES);
+      const selectedChallenges = this.selectChallengesForUser(challengeTypes, user);
       
-      const insertParams = [
-        chatId, challengeId, challengeType.id, challengeType.name,
-        challengeType.description, challengeType.target,
-        challengeType.reward.points, challengeType.reward.experience
-      ];
-      
-      console.log('Inserting new challenge with query:', insertQuery);
-      console.log('Insert parameters:', insertParams);
-      
-      const result = await this.database.db.prepare(insertQuery).bind(...insertParams).run();
-      console.log('Insert result:', result);
+      const createdChallenges = [];
 
-      const generatedChallenge = {
-        id: challengeId,
-        type: challengeType,
-        date: today,
-        progress: 0,
-        completed: false
-      };
-      
-      console.log('Generated challenge object:', generatedChallenge);
-      console.log('=== generateDailyChallenge END ===');
-      
-      return generatedChallenge;
+      for (const challenge of selectedChallenges) {
+        const result = await this.database.prepare(`
+          INSERT INTO daily_challenges (
+            chat_id, challenge_id, challenge_type, challenge_name, 
+            description, target_value, reward_points, reward_experience
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          chatId, challenge.id, challenge.type, challenge.name,
+          challenge.description, challenge.target, challenge.reward.points, challenge.reward.experience
+        ).run();
+
+        createdChallenges.push({
+          id: challenge.id,
+          name: challenge.name,
+          description: challenge.description,
+          target: challenge.target,
+          currentProgress: 0,
+          reward: challenge.reward,
+          isCompleted: false
+        });
+      }
+
+      return createdChallenges;
     } catch (error) {
-      console.error('Error generating daily challenge:', error);
-      console.error('Error stack:', error.stack);
-      console.error('Error name:', error.name);
-      console.error('Error message:', error.message);
-      return null;
+      console.error('Error generating daily challenges:', error);
+      return [];
     }
   }
 
-  // Получение случайного типа задания
-  getRandomChallengeType() {
-    console.log('=== getRandomChallengeType START ===');
-    const types = Object.values(DailyChallengeSystem.CHALLENGE_TYPES);
-    console.log('Available challenge types:', types);
-    console.log('Types count:', types.length);
+  // Выбор подходящих заданий для пользователя
+  selectChallengesForUser(challengeTypes, user) {
+    const userLevel = user.experience_points || 0;
+    const totalQuestions = user.total_questions || 0;
     
-    const selectedType = types[Math.floor(Math.random() * types.length)];
-    console.log('Selected challenge type:', selectedType);
-    console.log('=== getRandomChallengeType END ===');
+    // Фильтруем задания по уровню пользователя
+    let availableChallenges = challengeTypes;
     
-    return selectedType;
+    if (userLevel < 100) {
+      // Новички получают простые задания
+      availableChallenges = challengeTypes.filter(c => 
+        ['complete_3_tests', 'high_accuracy', 'fast_responses'].includes(c.id)
+      );
+    } else if (userLevel < 500) {
+      // Средний уровень
+      availableChallenges = challengeTypes.filter(c => 
+        !['perfect_session'].includes(c.id)
+      );
+    }
+    
+    // Исключаем задания, которые пользователь не может выполнить
+    if (totalQuestions < 10) {
+      availableChallenges = availableChallenges.filter(c => 
+        !['perfect_session', 'streak_maintain'].includes(c.id)
+      );
+    }
+
+    // Выбираем случайные задания
+    const shuffled = availableChallenges.sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, Math.min(4, shuffled.length));
   }
 
-  // Получение активных заданий пользователя
-  async getActiveChallenges(chatId) {
+  // Получение ежедневных заданий пользователя
+  async getUserDailyChallenges(chatId) {
     try {
-      console.log('=== getActiveChallenges START ===');
-      console.log('chatId:', chatId);
-      console.log('Database instance exists:', !!this.database);
-      console.log('Database.db exists:', !!this.database?.db);
+      const today = new Date().toISOString().split('T')[0];
       
-      const query = `
-        SELECT challenge_id, challenge_type, challenge_name, description,
-               target_value, current_progress, is_completed,
-               reward_points, reward_experience, created_date
+      const challenges = await this.database.prepare(`
+        SELECT challenge_id, challenge_name, description, target_value,
+               current_progress, is_completed, reward_points, reward_experience
         FROM daily_challenges 
-        WHERE chat_id = ? AND created_date = CURRENT_DATE
-        ORDER BY created_date DESC
-      `;
-      
-      console.log('Executing query:', query);
-      console.log('Query parameters:', [chatId]);
-      
-      const challenges = await this.database.db.prepare(query).bind(chatId).all();
-      console.log('Query result:', challenges);
-      console.log('Challenges results:', challenges.results);
-      console.log('Challenges count:', challenges.results?.length || 0);
-      
-      console.log('=== getActiveChallenges END ===');
-      return challenges.results || [];
+        WHERE chat_id = ? AND created_date = ?
+        ORDER BY is_completed ASC, challenge_id ASC
+      `).bind(chatId, today).all();
+
+      return challenges.results.map(challenge => ({
+        id: challenge.challenge_id,
+        name: challenge.challenge_name,
+        description: challenge.description,
+        target: challenge.target_value,
+        currentProgress: challenge.current_progress,
+        reward: {
+          experience: challenge.reward_experience,
+          points: challenge.reward_points
+        },
+        isCompleted: challenge.is_completed === 1
+      }));
     } catch (error) {
-      console.error('Error getting active challenges:', error);
-      console.error('Error stack:', error.stack);
-      console.error('Error name:', error.name);
-      console.error('Error message:', error.message);
+      console.error('Error getting user daily challenges:', error);
       return [];
     }
   }
 
   // Обновление прогресса задания
-  async updateChallengeProgress(chatId, challengeType, progress) {
+  async updateChallengeProgress(chatId, challengeId, progress) {
     try {
-      const today = new Date().toDateString();
-      const challengeId = `${challengeType}_${today}`;
+      const today = new Date().toISOString().split('T')[0];
+      
+      const result = await this.database.prepare(`
+        UPDATE daily_challenges 
+        SET current_progress = ?
+        WHERE chat_id = ? AND challenge_id = ? AND created_date = ?
+      `).bind(progress, chatId, challengeId, today).run();
 
-      await this.database.db.prepare(`
-        UPDATE daily_challenges SET 
-          current_progress = ?
-        WHERE chat_id = ? AND challenge_id = ? AND created_date = CURRENT_DATE
-      `).bind(progress, chatId, challengeId).run();
-
-      return true;
+      return result.meta.changes > 0;
     } catch (error) {
       console.error('Error updating challenge progress:', error);
       return false;
@@ -190,333 +211,219 @@ export class DailyChallengeSystem {
   // Завершение задания
   async completeChallenge(chatId, challengeId) {
     try {
-      const challenge = await this.database.db.prepare(`
-        SELECT * FROM daily_challenges 
-        WHERE chat_id = ? AND challenge_id = ? AND created_date = CURRENT_DATE
-      `).bind(chatId, challengeId).first();
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Получаем информацию о задании
+      const challenge = await this.database.prepare(`
+        SELECT challenge_name, reward_points, reward_experience
+        FROM daily_challenges 
+        WHERE chat_id = ? AND challenge_id = ? AND created_date = ?
+      `).bind(chatId, challengeId, today).first();
 
-      if (!challenge || challenge.is_completed) {
-        return false;
-      }
+      if (!challenge) return false;
 
-      // Отмечаем задание как завершенное
-      await this.database.db.prepare(`
-        UPDATE daily_challenges SET 
-          is_completed = TRUE,
-          completed_date = CURRENT_DATE
-        WHERE chat_id = ? AND challenge_id = ?
-      `).bind(chatId, challengeId).run();
+      // Отмечаем как завершенное
+      await this.database.prepare(`
+        UPDATE daily_challenges 
+        SET is_completed = 1, completed_date = CURRENT_DATE
+        WHERE chat_id = ? AND challenge_id = ? AND created_date = ?
+      `).bind(chatId, challengeId, today).run();
 
       // Награждаем пользователя
-      await this.database.updateUserStats(chatId, {
-        experiencePoints: challenge.reward_experience
+      await this.database.addExperience(chatId, 'daily_challenge', {
+        challengeName: challenge.challenge_name
       });
 
       // Логируем активность
       await this.database.logActivity(
         chatId,
         'daily_challenge_completed',
-        `Завершено задание: ${challenge.challenge_name}`,
+        `Завершено ежедневное задание: ${challenge.challenge_name}`,
         challenge.reward_points,
         challenge.reward_experience
       );
 
       return {
-        challenge,
-        rewards: {
-          points: challenge.reward_points,
-          experience: challenge.reward_experience
+        success: true,
+        reward: {
+          experience: challenge.reward_experience,
+          points: challenge.reward_points
         }
       };
     } catch (error) {
       console.error('Error completing challenge:', error);
-      return false;
+      return { success: false };
     }
   }
 
-  // Проверка и обновление прогресса заданий
-  async checkAndUpdateProgress(chatId, action, value) {
+  // Проверка и обновление прогресса всех заданий
+  async checkAndUpdateProgress(chatId) {
     try {
-      const activeChallenges = await this.getActiveChallenges(chatId);
-      
-      for (const challenge of activeChallenges) {
-        if (challenge.is_completed) continue;
+      const user = await this.database.getUser(chatId);
+      if (!user) return [];
 
-        let shouldUpdate = false;
-        let newProgress = challenge.current_progress;
+      const today = new Date().toISOString().split('T')[0];
+      const challenges = await this.getUserDailyChallenges(chatId);
+      const completedChallenges = [];
 
-        switch (challenge.challenge_type) {
-          case 'daily_questions':
-            if (action === 'answer_question') {
-              newProgress = challenge.current_progress + 1;
-              shouldUpdate = true;
+      for (const challenge of challenges) {
+        if (challenge.isCompleted) continue;
+
+        let newProgress = 0;
+        let shouldComplete = false;
+
+        switch (challenge.id) {
+          case 'complete_3_tests':
+            // Подсчитываем тесты за сегодня
+            const todayTests = await this.database.prepare(`
+              SELECT COUNT(*) as count
+              FROM learning_sessions 
+              WHERE chat_id = ? AND session_type = 'quick_test' 
+              AND DATE(start_time) = ?
+            `).bind(chatId, today).first();
+            newProgress = todayTests.count;
+            shouldComplete = newProgress >= challenge.target;
+            break;
+
+          case 'high_accuracy':
+            // Проверяем точность за сегодня
+            const todayAnswers = await this.database.prepare(`
+              SELECT COUNT(*) as total, SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct
+              FROM user_answers 
+              WHERE chat_id = ? AND DATE(answered_at) = ?
+            `).bind(chatId, today).first();
+            
+            if (todayAnswers.total > 0) {
+              newProgress = todayAnswers.correct / todayAnswers.total;
+              shouldComplete = newProgress >= challenge.target;
             }
             break;
 
-          case 'daily_streak':
-            if (action === 'streak_achieved' && value >= challenge.target_value) {
-              newProgress = challenge.target_value;
-              shouldUpdate = true;
+          case 'fast_responses':
+            // Подсчитываем быстрые ответы за сегодня
+            const fastAnswers = await this.database.prepare(`
+              SELECT COUNT(*) as count
+              FROM user_answers 
+              WHERE chat_id = ? AND DATE(answered_at) = ? 
+              AND response_time_ms < 15000 AND is_correct = 1
+            `).bind(chatId, today).first();
+            newProgress = fastAnswers.count;
+            shouldComplete = newProgress >= challenge.target;
+            break;
+
+          case 'perfect_session':
+            // Проверяем идеальную сессию
+            const perfectSession = await this.database.prepare(`
+              SELECT total_questions, correct_answers
+              FROM learning_sessions 
+              WHERE chat_id = ? AND DATE(start_time) = ? 
+              AND total_questions >= 5
+              ORDER BY start_time DESC
+              LIMIT 1
+            `).bind(chatId, today).first();
+            
+            if (perfectSession && perfectSession.total_questions > 0) {
+              const accuracy = perfectSession.correct_answers / perfectSession.total_questions;
+              newProgress = accuracy === 1 ? 1 : 0;
+              shouldComplete = newProgress >= challenge.target;
             }
             break;
 
-          case 'daily_category':
-            if (action === 'category_studied' && value === challenge.target_value) {
-              newProgress = 1;
-              shouldUpdate = true;
-            }
+          case 'streak_maintain':
+            // Проверяем серию правильных ответов
+            const currentStreak = user.learning_streak || 0;
+            newProgress = currentStreak;
+            shouldComplete = newProgress >= challenge.target;
             break;
 
-          case 'daily_accuracy':
-            if (action === 'test_completed' && value >= challenge.target_value) {
-              newProgress = challenge.target_value;
-              shouldUpdate = true;
-            }
-            break;
-
-          case 'daily_ai':
-            if (action === 'ai_question_answered') {
-              newProgress = challenge.current_progress + 1;
-              shouldUpdate = true;
-            }
-            break;
+          default:
+            continue;
         }
 
-        if (shouldUpdate) {
-          await this.updateChallengeProgress(chatId, challenge.challenge_type, newProgress);
-          
-          // Проверяем, завершено ли задание
-          if (newProgress >= challenge.target_value) {
-            const completion = await this.completeChallenge(chatId, challenge.challenge_id);
-            if (completion) {
-              await this.notifyChallengeCompleted(chatId, completion);
-            }
+        // Обновляем прогресс
+        await this.updateChallengeProgress(chatId, challenge.id, newProgress);
+
+        // Если задание выполнено, завершаем его
+        if (shouldComplete && !challenge.isCompleted) {
+          const result = await this.completeChallenge(chatId, challenge.id);
+          if (result.success) {
+            completedChallenges.push({
+              challenge,
+              reward: result.reward
+            });
           }
         }
       }
+
+      return completedChallenges;
     } catch (error) {
       console.error('Error checking challenge progress:', error);
+      return [];
     }
-  }
-
-  // Уведомление о завершении задания
-  async notifyChallengeCompleted(chatId, completion) {
-    const { challenge, rewards } = completion;
-    
-    const message = `🎉 *Ежедневное задание выполнено!*
-
-✅ **${challenge.challenge_name}**
-${challenge.description}
-
-💎 +${rewards.experience} XP
-🏆 +${rewards.points} баллов
-
-Отличная работа! Продолжайте в том же духе! 🚀`;
-
-    await sendMessage(chatId, message, this.env);
   }
 
   // Отображение ежедневных заданий
   async showDailyChallenges(chatId) {
     try {
-      console.log('=== DailyChallengeSystem.showDailyChallenges START ===');
-      console.log('chatId:', chatId);
-      console.log('Database instance exists:', !!this.database);
-      console.log('Env keys:', Object.keys(this.env));
-      
-      // Проверяем подключение к базе данных
-      if (!this.database || !this.database.db) {
-        throw new Error('Database connection not available');
-      }
-      
-      console.log('Getting active challenges...');
-      const challenges = await this.getActiveChallenges(chatId);
-      console.log('Active challenges retrieved:', challenges);
-      console.log('Challenges count:', challenges.length);
+      let challenges = await this.getUserDailyChallenges(chatId);
       
       if (challenges.length === 0) {
-        console.log('No active challenges, generating new ones...');
-        
-        // Генерируем новые задания
-        console.log('Generating challenge 1...');
-        const challenge1 = await this.generateDailyChallenge(chatId);
-        console.log('Generated challenge 1:', challenge1);
-        
-        console.log('Generating challenge 2...');
-        const challenge2 = await this.generateDailyChallenge(chatId);
-        console.log('Generated challenge 2:', challenge2);
-        
-        console.log('Generating challenge 3...');
-        const challenge3 = await this.generateDailyChallenge(chatId);
-        console.log('Generated challenge 3:', challenge3);
-        
-        console.log('Getting newly generated challenges...');
-        const newChallenges = await this.getActiveChallenges(chatId);
-        console.log('New challenges generated:', newChallenges);
-        console.log('New challenges count:', newChallenges.length);
-        
-        if (newChallenges.length === 0) {
-          throw new Error('Failed to generate daily challenges');
-        }
-        
-        console.log('Displaying newly generated challenges...');
-        await this.displayChallenges(chatId, newChallenges);
-      } else {
-        console.log('Displaying existing challenges...');
-        await this.displayChallenges(chatId, challenges);
+        challenges = await this.generateDailyChallenges(chatId);
       }
-      
-      console.log('=== DailyChallengeSystem.showDailyChallenges END ===');
-    } catch (error) {
-      console.error('Error showing daily challenges:', error);
-      console.error('Error stack:', error.stack);
-      console.error('Error name:', error.name);
-      console.error('Error message:', error.message);
-      
-      // Отправляем более информативное сообщение об ошибке
-      const errorMessage = `❌ Ошибка загрузки ежедневных заданий
 
-🔍 Детали ошибки:
-• Тип: ${error.name}
-• Сообщение: ${error.message}
-
-Попробуйте позже или обратитесь к администратору.`;
-      
-      await sendMessage(chatId, errorMessage, this.env);
-    }
-  }
-
-  // Отображение списка заданий
-  async displayChallenges(chatId, challenges) {
-    try {
-      console.log('=== displayChallenges START ===');
-      console.log('chatId:', chatId);
-      console.log('challenges count:', challenges.length);
-      console.log('challenges:', challenges);
-      
-      if (!challenges || challenges.length === 0) {
-        console.log('No challenges to display');
-        await sendMessage(chatId, '📅 У вас пока нет ежедневных заданий. Попробуйте позже!', this.env);
+      if (challenges.length === 0) {
+        await sendMessage(chatId, '📅 Сегодня нет доступных заданий. Загляните завтра!', this.env);
         return;
       }
-      
+
       let message = `📅 *Ежедневные задания*\n\n`;
       
-      let totalRewards = { points: 0, experience: 0 };
-      let completedCount = 0;
+      const completed = challenges.filter(c => c.isCompleted);
+      const inProgress = challenges.filter(c => !c.isCompleted);
 
-      for (const challenge of challenges) {
-        console.log('Processing challenge:', challenge);
-        
-        const status = challenge.is_completed ? '✅' : '⏳';
-        const progress = challenge.is_completed ? 
-          `${challenge.target_value}/${challenge.target_value}` : 
-          `${challenge.current_progress}/${challenge.target_value}`;
-
-        message += `${status} **${challenge.challenge_name}**\n`;
-        message += `└ ${challenge.description}\n`;
-        message += `└ 📊 Прогресс: ${progress}\n`;
-        message += `└ 💎 Награда: +${challenge.reward_experience} XP\n\n`;
-
-        if (challenge.is_completed) {
-          completedCount++;
-          totalRewards.points += challenge.reward_points;
-          totalRewards.experience += challenge.reward_experience;
+      if (completed.length > 0) {
+        message += `✅ *Завершенные:*\n`;
+        for (const challenge of completed) {
+          message += `🎯 **${challenge.name}**\n`;
+          message += `└ ${challenge.description}\n`;
+          message += `└ 💎 +${challenge.reward.experience} XP\n\n`;
         }
       }
 
-      message += `📈 *Прогресс дня:* ${completedCount}/${challenges.length} заданий выполнено\n`;
-      message += `🎁 *Награды за сегодня:* +${totalRewards.experience} XP`;
-
-      const keyboard = {
-        inline_keyboard: [
-          [
-            { text: '🔄 Обновить', callback_data: 'daily_challenges_refresh' },
-            { text: '📊 Статистика', callback_data: 'daily_challenges_stats' }
-          ],
-          [
-            { text: '🔙 Назад', callback_data: 'learning_start' }
-          ]
-        ]
-      };
-
-      console.log('Message length:', message.length);
-      console.log('Keyboard:', JSON.stringify(keyboard, null, 2));
-      console.log('Env keys:', Object.keys(this.env));
-      
-      console.log('Sending message with keyboard...');
-      await sendMessageWithKeyboard(chatId, message, keyboard, this.env);
-      console.log('Message sent successfully');
-      console.log('=== displayChallenges END ===');
-    } catch (error) {
-      console.error('Error in displayChallenges:', error);
-      console.error('Error stack:', error.stack);
-      console.error('Error name:', error.name);
-      console.error('Error message:', error.message);
-      
-      // Отправляем более информативное сообщение об ошибке
-      const errorMessage = `❌ Ошибка отображения заданий
-
-🔍 Детали ошибки:
-• Тип: ${error.name}
-• Сообщение: ${error.message}
-
-Попробуйте позже или обратитесь к администратору.`;
-      
-      await sendMessage(chatId, errorMessage, this.env);
-    }
-  }
-
-  // Получение статистики ежедневных заданий
-  async getChallengeStats(chatId) {
-    try {
-      const stats = await this.database.db.prepare(`
-        SELECT 
-          COUNT(*) as total_challenges,
-          SUM(CASE WHEN is_completed THEN 1 ELSE 0 END) as completed_challenges,
-          SUM(CASE WHEN is_completed THEN reward_points ELSE 0 END) as total_points_earned,
-          SUM(CASE WHEN is_completed THEN reward_experience ELSE 0 END) as total_experience_earned
-        FROM daily_challenges 
-        WHERE chat_id = ? AND created_date >= date('now', '-7 days')
-      `).bind(chatId).first();
-
-      return stats;
-    } catch (error) {
-      console.error('Error getting challenge stats:', error);
-      return null;
-    }
-  }
-
-  // Отображение статистики заданий
-  async showChallengeStats(chatId) {
-    try {
-      const stats = await this.getChallengeStats(chatId);
-      if (!stats) {
-        await sendMessage(chatId, '❌ Ошибка загрузки статистики', this.env);
-        return;
+      if (inProgress.length > 0) {
+        message += `🔄 *В процессе:*\n`;
+        for (const challenge of inProgress) {
+          const progressPercent = Math.min(Math.round((challenge.currentProgress / challenge.target) * 100), 100);
+          message += `🎯 **${challenge.name}**\n`;
+          message += `└ ${challenge.description}\n`;
+          message += `└ 📊 Прогресс: ${challenge.currentProgress}/${challenge.target} (${progressPercent}%)\n`;
+          message += `└ 💎 Награда: +${challenge.reward.experience} XP\n\n`;
+        }
       }
 
-      const completionRate = stats.total_challenges > 0 ? 
-        Math.round((stats.completed_challenges / stats.total_challenges) * 100) : 0;
-
-      const message = `📊 *Статистика ежедневных заданий*
-
-📅 *За последние 7 дней:*
-• Всего заданий: ${stats.total_challenges}
-• Выполнено: ${stats.completed_challenges}
-• Процент выполнения: ${completionRate}%
-• Заработано баллов: ${stats.total_points_earned}
-• Заработано опыта: ${stats.total_experience_earned} XP
-
-🎯 *Рекомендации:*
-${completionRate >= 80 ? '✅ Отличная работа! Вы регулярно выполняете задания.' : 
-  completionRate >= 50 ? '🟡 Хорошо! Попробуйте выполнять больше заданий.' : 
-  '🔴 Рекомендуем чаще выполнять ежедневные задания для лучшего прогресса.'}`;
+      const totalCompleted = completed.length;
+      const totalChallenges = challenges.length;
+      message += `📈 *Общий прогресс:* ${totalCompleted}/${totalChallenges} заданий выполнено`;
 
       await sendMessage(chatId, message, this.env);
     } catch (error) {
-      console.error('Error showing challenge stats:', error);
-      await sendMessage(chatId, '❌ Ошибка отображения статистики', this.env);
+      console.error('Error showing daily challenges:', error);
+      await sendMessage(chatId, '❌ Ошибка отображения ежедневных заданий', this.env);
     }
+  }
+
+  // Уведомление о завершении задания
+  async notifyChallengeCompletion(chatId, challenge, reward) {
+    const message = `🎉 *Задание выполнено!*
+
+🎯 **${challenge.name}**
+${challenge.description}
+
+💎 +${reward.experience} очков опыта
+🏆 +${reward.points} очков
+
+Отличная работа! Продолжайте в том же духе! 🚀`;
+
+    await sendMessage(chatId, message, this.env);
   }
 } 
