@@ -6,6 +6,18 @@ import { AnalyticsHandler } from './analytics.js';
 import { UsersHandler } from './users.js';
 import { TelegramHandler } from './telegram.js';
 
+// Cloudflare KV state helpers
+async function getUserState(chatId, env) {
+  const raw = await env.WINE_CACHE.get(`admin_state_${chatId}`);
+  return raw ? JSON.parse(raw) : null;
+}
+async function setUserState(chatId, state, env) {
+  await env.WINE_CACHE.put(`admin_state_${chatId}`, JSON.stringify(state));
+}
+async function clearUserState(chatId, env) {
+  await env.WINE_CACHE.delete(`admin_state_${chatId}`);
+}
+
 export class CommandsHandler {
   constructor(env) {
     this.env = env;
@@ -15,7 +27,7 @@ export class CommandsHandler {
     this.users = new UsersHandler(env);
     
     // Состояния пользователей для многошаговых команд
-    this.userStates = new Map();
+    // this.userStates = new Map(); // Удалено, заменено на KV
   }
 
   // Обработка команды /start
@@ -27,23 +39,27 @@ export class CommandsHandler {
 📊 <b>Аналитика</b> - статистика системы и пользователей
 📝 <b>Отзывы</b> - обратная связь от пользователей  
 👥 <b>Пользователи</b> - управление пользователями
+🎁 <b>Призы</b> - магазин призов за XP
 🔍 <b>Поиск</b> - поиск по системе
 
 💡 <b>Используйте кнопки для навигации!</b>`;
 
-          const keyboard = this.telegram.createInlineKeyboard([
-        [
-          { text: '📊 Аналитика', callback_data: 'admin_analytics' },
-          { text: '📝 Отзывы', callback_data: 'admin_feedback' }
-        ],
-        [
-          { text: '👥 Пользователи', callback_data: 'admin_users' },
-          { text: '🔍 Поиск', callback_data: 'admin_search' }
-        ],
-        [
-          { text: '❓ Помощь', callback_data: 'admin_help' }
-        ]
-      ]);
+    const keyboard = this.telegram.createInlineKeyboard([
+      [
+        { text: '📊 Аналитика', callback_data: 'admin_analytics' },
+        { text: '📝 Отзывы', callback_data: 'admin_feedback' }
+      ],
+      [
+        { text: '👥 Пользователи', callback_data: 'admin_users' },
+        { text: '🎁 Призы', callback_data: 'admin_rewards' }
+      ],
+      [
+        { text: '🔍 Поиск', callback_data: 'admin_search' }
+      ],
+      [
+        { text: '❓ Помощь', callback_data: 'admin_help' }
+      ]
+    ]);
 
     await this.telegram.sendMessageWithKeyboard(chatId, message, keyboard);
   }
@@ -348,6 +364,8 @@ export class CommandsHandler {
       await this.handleBroadcast(chatId, args);
       return true;
     }
+    // Обработка добавления приза
+    if (await this.handleTextForReward(chatId, text)) return true;
     return false;
   }
 
@@ -485,6 +503,15 @@ export class CommandsHandler {
           break;
         case fullAction.startsWith('mark_feedback_'):
           await this.handleMarkFeedbackProcessed(chatId, [fullAction.replace('mark_feedback_', '')]);
+          break;
+        case fullAction === 'rewards':
+          await this.handleRewards(chatId);
+          break;
+        case fullAction === 'add_reward':
+          await this.handleAddReward(chatId);
+          break;
+        case fullAction.startsWith('delete_reward_'):
+          await this.handleDeleteReward(chatId, fullAction.replace('delete_reward_', ''));
           break;
         case fullAction === 'help':
           await this.handleHelp(chatId);
@@ -753,5 +780,88 @@ export class CommandsHandler {
     ]);
 
     await this.telegram.sendMessageWithKeyboard(chatId, message, keyboard);
+  }
+
+  // Просмотр всех призов
+  async handleRewards(chatId) {
+    const db = this.env.DB;
+    const rewards = await db.prepare('SELECT * FROM reward_shop ORDER BY price_xp ASC').all();
+    let message = '<b>🎁 Магазин призов</b>\n\n';
+    if (rewards.results.length === 0) {
+      message += 'Нет доступных призов.';
+    } else {
+      for (const r of rewards.results) {
+        message += `• <b>${r.name}</b> — ${r.price_xp} XP\n` +
+          `ID: ${r.id} | Всего: ${r.quantity} | Осталось: ${r.quantity_left} | Активен: ${r.is_active ? 'Да' : 'Нет'}\n` +
+          `${r.description || ''}\n\n`;
+      }
+    }
+    const keyboard = this.telegram.createInlineKeyboard([
+      [{ text: '➕ Добавить приз', callback_data: 'admin_add_reward' }],
+      [{ text: '🔙 Назад', callback_data: 'admin_main_menu' }]
+    ]);
+    await this.telegram.sendMessageWithKeyboard(chatId, message, keyboard);
+  }
+
+  // Добавление нового приза (многошагово)
+  async handleAddReward(chatId) {
+    await setUserState(chatId, { step: 'awaiting_reward_name' }, this.env);
+    await this.telegram.sendMessage(chatId, 'Введите название нового приза:');
+  }
+
+  // Обработка текстовых сообщений для добавления приза
+  async handleTextForReward(chatId, text) {
+    const state = await getUserState(chatId, this.env);
+    if (!state) return false;
+    const db = this.env.DB;
+    if (state.step === 'awaiting_reward_name') {
+      state.name = text;
+      state.step = 'awaiting_reward_price';
+      await setUserState(chatId, state, this.env);
+      await this.telegram.sendMessage(chatId, 'Введите стоимость приза в XP:');
+      return true;
+    }
+    if (state.step === 'awaiting_reward_price') {
+      const price = parseInt(text);
+      if (isNaN(price) || price <= 0) {
+        await this.telegram.sendMessage(chatId, 'Стоимость должна быть положительным числом. Введите снова:');
+        return true;
+      }
+      state.price_xp = price;
+      state.step = 'awaiting_reward_quantity';
+      await setUserState(chatId, state, this.env);
+      await this.telegram.sendMessage(chatId, 'Введите количество призов (целое число > 0):');
+      return true;
+    }
+    if (state.step === 'awaiting_reward_quantity') {
+      const quantity = parseInt(text);
+      if (isNaN(quantity) || quantity <= 0) {
+        await this.telegram.sendMessage(chatId, 'Количество должно быть положительным целым числом. Введите снова:');
+        return true;
+      }
+      state.quantity = quantity;
+      state.step = 'awaiting_reward_desc';
+      await setUserState(chatId, state, this.env);
+      await this.telegram.sendMessage(chatId, 'Введите описание приза (или - для пропуска):');
+      return true;
+    }
+    if (state.step === 'awaiting_reward_desc') {
+      const desc = text === '-' ? '' : text;
+      await db.prepare('INSERT INTO reward_shop (name, description, price_xp, quantity, quantity_left, is_active) VALUES (?, ?, ?, ?, ?, 1)')
+        .bind(state.name, desc, state.price_xp, state.quantity, state.quantity).run();
+      await clearUserState(chatId, this.env);
+      await this.telegram.sendMessage(chatId, '✅ Приз добавлен!');
+      await this.handleRewards(chatId);
+      return true;
+    }
+    return false;
+  }
+
+  // Удаление (деактивация) приза
+  async handleDeleteReward(chatId, rewardId) {
+    const db = this.env.DB;
+    await db.prepare('UPDATE reward_shop SET is_active = 0 WHERE id = ?').bind(rewardId).run();
+    await this.telegram.sendMessage(chatId, 'Приз удалён.');
+    await this.handleRewards(chatId);
   }
 } 

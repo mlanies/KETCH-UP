@@ -144,6 +144,8 @@ export async function handleMessage(message, env) {
       const database = new DatabaseManager(env);
       await database.setMotivationEnabled(chatId, false);
       await sendMessage(chatId, '🔕 Мотивационные сообщения отключены. Вы не будете получать напоминания и мотивацию.', env);
+    } else if (text === '/shop') {
+      await showRewardShop(chatId, env);
     } else {
       // Поиск по названию вина
       await searchWineByName(text, chatId, env);
@@ -236,6 +238,18 @@ export async function handleCallbackQuery(callbackQuery, env) {
       await handleLearningCallback(data, chatId, messageId, env);
     } else if (data === 'show_author') {
       await sendAuthorInfo(chatId, env);
+    } else if (data.startsWith('buy_reward_')) {
+      const rewardId = parseInt(data.replace('buy_reward_', ''));
+      await handleBuyReward(chatId, rewardId, env);
+      return;
+    } else if (data === 'open_reward_shop') {
+      await showRewardShop(chatId, env);
+      return;
+    }
+    if (data === 'no_xp') {
+      await sendMessage(chatId, 'Недостаточно XP для покупки этого приза.', env);
+      await showRewardShop(chatId, env);
+      return;
     }
     
     // Отвечаем на callback query
@@ -257,8 +271,7 @@ export async function handleCallbackQuery(callbackQuery, env) {
 
 // Отправка приветственного сообщения
 export async function sendWelcomeMessage(chatId, env) {
-  const welcomeText = `🍷 Добро пожаловать в Beverage Learning Bot!
-\n🏪 *Ресторан KETCH UP*\n\nРестораны Ketch Up — для современных и динамичных. Это формат ресторана для мегаполиса. Здесь можно устроить деловую встречу, весело провести время с друзьями в шумной компании, собрать семью на ланч, ужин или позавтракать перед насыщенным рабочим днем.\n\nЭтот бот поможет вам изучить ассортимент напитков и улучшить качество обслуживания клиентов.\n\nВыберите раздел или откройте мини-приложение:`;
+  const welcomeText = `🍷 Добро пожаловать в Beverage Learning Bot!\n\n🏪 *Ресторан KETCH UP*\n\nРестораны Ketch Up — для современных и динамичных. Это формат ресторана для мегаполиса. Здесь можно устроить деловую встречу, весело провести время с друзьями в шумной компании, собрать семью на ланч, ужин или позавтракать перед насыщенным рабочим днем.\n\nЭтот бот поможет вам изучить ассортимент напитков и улучшить качество обслуживания клиентов.\n\nВыберите раздел или откройте мини-приложение:`;
 
   const keyboard = {
     inline_keyboard: [
@@ -278,6 +291,9 @@ export async function sendWelcomeMessage(chatId, env) {
       ],
       [
         { text: '🔄 Обновить данные', callback_data: 'refresh_data' }
+      ],
+      [
+        { text: '🎁 Магазин', callback_data: 'open_reward_shop' }
       ],
       [
         { text: '🤖 Спросить у ИИ', callback_data: 'ask_ai' }
@@ -310,6 +326,9 @@ export async function sendMainMenu(chatId, env) {
       ],
       [
         { text: '🔄 Обновить данные', callback_data: 'refresh_data' }
+      ],
+      [
+        { text: '🎁 Магазин', callback_data: 'open_reward_shop' }
       ],
       [
         { text: '🤖 Спросить у ИИ', callback_data: 'ask_ai' }
@@ -619,4 +638,68 @@ function getCloudflareImageUrl(imageId, env) {
   const baseUrl = env.CLOUDFLARE_IMAGES_BASE_URL || "https://imagedelivery.net/tdcdGyOL6_eTEtlo-2Ihkw";
   const variant = env.CLOUDFLARE_IMAGES_VARIANT || "public";
   return `${baseUrl}/${imageId}/${variant}`;
+} 
+
+// Показывает магазин призов пользователю
+async function showRewardShop(chatId, env) {
+  const { DatabaseManager } = await import('./database.js');
+  const database = new DatabaseManager(env);
+  const db = database.db;
+  const user = await db.prepare('SELECT * FROM users WHERE chat_id = ?').bind(chatId).first();
+  const rewards = await db.prepare('SELECT * FROM reward_shop WHERE is_active = 1 AND quantity_left > 0 ORDER BY price_xp ASC').all();
+  let message = `<b>🎁 Магазин призов</b>\n`;
+  if (user) {
+    message += `Ваши XP: <b>${user.experience_points}</b>\n`;
+  }
+  message += `<b>Товары:</b>\n`;
+  if (rewards.results.length === 0) {
+    message += 'Нет доступных призов.';
+  } else {
+    for (const r of rewards.results) {
+      if (r.quantity_left > 0) {
+        message += `• <b>${r.name}</b> — ${r.price_xp} XP\nОсталось: ${r.quantity_left}\n`;
+      }
+    }
+  }
+  const keyboard = rewards.results
+    .filter(r => r.quantity_left > 0)
+    .map(r => {
+      if (user && user.experience_points >= r.price_xp) {
+        return [{ text: `Купить: ${r.name} (${r.price_xp} XP)`, callback_data: `buy_reward_${r.id}` }];
+      } else {
+        return [{ text: `Недостаточно XP: ${r.name}`, callback_data: 'no_xp' }];
+      }
+    });
+  keyboard.push([{ text: '🔙 Назад', callback_data: 'main_menu' }]);
+  await sendMessageWithKeyboard(chatId, message, { inline_keyboard: keyboard }, env, 'HTML');
+}
+
+// Покупка приза
+async function handleBuyReward(chatId, rewardId, env) {
+  const { DatabaseManager } = await import('./database.js');
+  const database = new DatabaseManager(env);
+  const db = database.db;
+  const reward = await db.prepare('SELECT * FROM reward_shop WHERE id = ? AND is_active = 1').bind(rewardId).first();
+  if (!reward) {
+    await sendMessage(chatId, '❌ Приз не найден или недоступен.', env);
+    return;
+  }
+  if (reward.quantity_left !== null && reward.quantity_left <= 0) {
+    await sendMessage(chatId, '❌ Приз закончился и больше недоступен для покупки.', env);
+    return;
+  }
+  const user = await db.prepare('SELECT * FROM users WHERE chat_id = ?').bind(chatId).first();
+  if (!user) {
+    await sendMessage(chatId, '❌ Пользователь не найден.', env);
+    return;
+  }
+  if (user.experience_points < reward.price_xp) {
+    await sendMessage(chatId, `Недостаточно XP. Для покупки нужно ${reward.price_xp} XP, у вас: ${user.experience_points} XP.`, env);
+    return;
+  }
+  // Списываем XP, уменьшаем количество и записываем покупку
+  await db.prepare('UPDATE users SET experience_points = experience_points - ? WHERE chat_id = ?').bind(reward.price_xp, chatId).run();
+  await db.prepare('UPDATE reward_shop SET quantity_left = quantity_left - 1 WHERE id = ?').bind(rewardId).run();
+  await db.prepare('INSERT INTO reward_purchases (user_id, reward_id) VALUES (?, ?)').bind(chatId, rewardId).run();
+  await sendMessage(chatId, `🎉 Поздравляем! Вы купили приз: ${reward.name} за ${reward.price_xp} XP.`, env);
 } 

@@ -51,7 +51,7 @@ export async function sendMessage(chatId, text, env) {
 }
 
 // Отправка сообщения с клавиатурой
-export async function sendMessageWithKeyboard(chatId, text, keyboard, env) {
+export async function sendMessageWithKeyboard(chatId, text, keyboard, env, parseMode) {
   console.log('=== sendMessageWithKeyboard START ===');
   console.log('chatId:', chatId);
   console.log('text length:', text.length);
@@ -70,7 +70,7 @@ export async function sendMessageWithKeyboard(chatId, text, keyboard, env) {
     const requestBody = {
       chat_id: chatId,
       text: text,
-      parse_mode: 'Markdown',
+      parse_mode: parseMode || 'Markdown',
       reply_markup: keyboard
     };
     
