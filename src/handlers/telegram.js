@@ -31,6 +31,19 @@ export async function handleMessage(message, env) {
   const chatId = message.chat.id;
   const text = message.text || '';
   
+  // Сохраняем/обновляем профиль пользователя
+  try {
+    const { DatabaseManager } = await import('./database.js');
+    const database = new DatabaseManager(env);
+    if (message.from) {
+      await database.initUser(chatId, message.from);
+    } else {
+      await database.initUser(chatId);
+    }
+  } catch (e) {
+    console.error('initUser error:', e);
+  }
+
   try {
     if (text === '/start') {
       await sendWelcomeMessage(chatId, env);
@@ -116,9 +129,10 @@ export async function handleMessage(message, env) {
     } else if (env.__awaiting_feedback && env.__awaiting_feedback[chatId]) {
       env.__awaiting_feedback[chatId] = false;
       // Сохраняем комментарий пользователя в базу данных
-      const { saveUserFeedback } = await import('./learning.js');
+      const { saveUserFeedback, startLearning } = await import('./learning.js');
       await saveUserFeedback(chatId, 'comment', text, null, env);
       await sendMessage(chatId, 'Спасибо за ваш подробный отзыв!', env);
+      await startLearning(chatId, env);
       return;
     } else {
       // Поиск по названию вина
@@ -136,6 +150,19 @@ export async function handleCallbackQuery(callbackQuery, env) {
   const messageId = callbackQuery.message.message_id;
   const data = callbackQuery.data;
   
+  // Сохраняем/обновляем профиль пользователя
+  try {
+    const { DatabaseManager } = await import('./database.js');
+    const database = new DatabaseManager(env);
+    if (callbackQuery.from) {
+      await database.initUser(chatId, callbackQuery.from);
+    } else {
+      await database.initUser(chatId);
+    }
+  } catch (e) {
+    console.error('initUser error:', e);
+  }
+
   console.log('Callback query received:', data);
   
   try {
@@ -314,6 +341,7 @@ export async function showWineDetails(data, chatId, env) {
   const wine = wines.find(w => w.id === wineId);
   console.log('Found wine:', wine ? wine.name : 'NOT FOUND');
   console.log('wine object:', JSON.stringify(wine, null, 2));
+  console.log('wine.image_id:', wine.image_id);
 
   if (!wine) {
     console.log('Wine not found, sending error message');
@@ -390,9 +418,13 @@ ${wine.description || 'Описание отсутствует'}`;
   };
 
   try {
-    if (wine.image) {
+    let imageUrl = null;
+    if (wine.image_id) {
+      imageUrl = getCloudflareImageUrl(wine.image_id, env);
+    }
+    if (imageUrl) {
       console.log('Sending photo with caption...');
-      await sendPhotoWithCaption(chatId, wine.image, wineText, keyboard, env);
+      await sendPhotoWithCaption(chatId, imageUrl, wineText, keyboard, env);
       console.log('Photo sent!');
     } else {
       console.log('Sending message with keyboard...');
@@ -571,4 +603,10 @@ export async function sendAuthorInfo(chatId, env) {
   };
   
   await sendMessageWithKeyboard(chatId, text, keyboard, env);
+} 
+
+function getCloudflareImageUrl(imageId, env) {
+  const baseUrl = env.CLOUDFLARE_IMAGES_BASE_URL || "https://imagedelivery.net/tdcdGyOL6_eTEtlo-2Ihkw";
+  const variant = env.CLOUDFLARE_IMAGES_VARIANT || "public";
+  return `${baseUrl}/${imageId}/${variant}`;
 } 

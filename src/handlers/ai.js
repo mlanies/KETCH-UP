@@ -40,21 +40,23 @@ function cleanupCache() {
 
 // Функция для создания персонализированного промпта
 function createPersonalizedPrompt(basePrompt, userContext = {}) {
-  let personalizedPrompt = basePrompt;
-  
+  let personalizedPrompt = '';
+  if (userContext.first_name) {
+    personalizedPrompt += `${userContext.first_name}, `;
+  } else if (userContext.username) {
+    personalizedPrompt += `${userContext.username}, `;
+  }
+  personalizedPrompt += basePrompt;
   // Добавляем контекст пользователя
   if (userContext.difficulty) {
     personalizedPrompt += `\n\nУровень знаний пользователя: ${userContext.difficulty}`;
   }
-  
   if (userContext.preferences) {
     personalizedPrompt += `\n\nПредпочтения пользователя: ${userContext.preferences.join(', ')}`;
   }
-  
   if (userContext.previousQuestions) {
     personalizedPrompt += `\n\nПредыдущие вопросы пользователя: ${userContext.previousQuestions.slice(-3).join(', ')}`;
   }
-  
   return personalizedPrompt;
 }
 

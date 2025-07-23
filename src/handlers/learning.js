@@ -926,15 +926,24 @@ export async function handleLearningCallback(data, chatId, messageId, env) {
       await showDetailedStats(chatId, env);
     } else if (data === 'feedback_like') {
       await saveUserFeedback(chatId, 'like', null, null, env);
+      console.log('[LEARNING] Sending thank you message for feedback_like');
       await sendMessage(chatId, 'Спасибо за ваш отзыв! 😊', env);
+      console.log('[LEARNING] Calling startLearning after feedback_like');
+      await startLearning(chatId, env);
       return;
     } else if (data === 'feedback_hard') {
       await saveUserFeedback(chatId, 'hard', null, null, env);
+      console.log('[LEARNING] Sending thank you message for feedback_hard');
       await sendMessage(chatId, 'Спасибо! Мы учтём, что вопросы были сложными.', env);
+      console.log('[LEARNING] Calling startLearning after feedback_hard');
+      await startLearning(chatId, env);
       return;
     } else if (data === 'feedback_easy') {
       await saveUserFeedback(chatId, 'easy', null, null, env);
+      console.log('[LEARNING] Sending thank you message for feedback_easy');
       await sendMessage(chatId, 'Спасибо! Мы постараемся сделать вопросы интереснее.', env);
+      console.log('[LEARNING] Calling startLearning after feedback_easy');
+      await startLearning(chatId, env);
       return;
     } else if (data === 'feedback_comment') {
       if (!env.__awaiting_feedback) env.__awaiting_feedback = {};

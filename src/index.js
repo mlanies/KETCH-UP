@@ -1210,27 +1210,39 @@ async function sendLearningReminders(env) {
       const weakTopic = userData.weakTopics[0] || '';
       const isRecordStreak = userData.streak && userData.streak === userData.maxStreak && userData.streak > 0;
 
-      // Вариативный промпт для AI
-      const prompt = `Ты корпоративный наставник и мотиватор. Вот данные о сотруднике:
-- Уровень: ${userData.level} ${userData.levelName}
-- Прогресс: ${userData.progress}%
-- Последний урок: ${userData.lastLearningDate || 'нет данных'}
-- Серия правильных ответов: ${userData.streak}${isRecordStreak ? ' (рекорд!)' : ''}
-- Ошибок за всё время: ${userData.errors}
-- Достижения: ${achievements.join(', ') || 'нет'}
-- Сильные стороны: ${userData.strongTopics.join(', ') || 'нет'}
-- Слабые стороны: ${userData.weakTopics.join(', ') || 'нет'}
-- Любимая категория: ${favoriteTopic || 'нет'}
-- Время суток: ${timeOfDay}
-- Динамика: за неделю прогресс ${progressDynamics >= 0 ? 'вырос' : 'упал'} на ${Math.abs(progressDynamics)} XP
-- До следующего уровня: ${stats?.user?.next_level_xp ? (stats.user.next_level_xp - stats.user.experience_points) : 'нет данных'} XP
-
-Сформулируй короткое (до 200 символов) мотивационное сообщение, поздравь с достижениями, подскажи, что осталось до следующей цели, предложи пройти урок по слабой теме, пожелай хорошего ${timeOfDay}. Используй дружелюбный стиль, эмодзи, вариативные фразы, вопросы, челленджи, поздравления, пожелания. Не повторяйся каждый день!`;
+      // Имя пользователя для персонализации
+      const userName = userData.firstName || userData.lastName || userData.username || '';
+      // Пул шаблонов промптов для ИИ с добавлением имени
+      const promptTemplates = [
+        `${userName ? userName + ', ' : ''}Уровень: ${userData.level}, прогресс: ${userData.progress}%. Серия: ${userData.streak}. Слабая тема: ${weakTopic || 'нет'}. Сформулируй короткое мотивационное сообщение с призывом пройти урок по слабой теме, похвали за успехи, добавь эмодзи и дружелюбный стиль. Не используй приветствие и не повторяйся!`,
+        `${userName ? userName + ', ' : ''}За неделю прогресс ${progressDynamics >= 0 ? 'вырос' : 'упал'} на ${Math.abs(progressDynamics)} XP. Серия: ${userData.streak}. Слабая тема: ${weakTopic || 'нет'}. Сформулируй короткое мотивационное сообщение: похвали за динамику, предложи челлендж по слабой теме, добавь эмодзи. Без приветствия!`,
+        `${userName ? userName + ', ' : ''}Сейчас ${timeOfDay}. Уровень: ${userData.level}. Слабая тема: ${weakTopic || 'нет'}. Сформулируй короткое мотивационное сообщение: пожелай хорошего ${timeOfDay}, предложи пройти урок по слабой теме, добавь эмодзи. Без приветствия!`,
+        `${userName ? userName + ', ' : ''}Недавно получено достижение: ${achievements[0] || 'нет'}. Серия: ${userData.streak}. Слабая тема: ${weakTopic || 'нет'}. Сформулируй короткое мотивационное сообщение: поздравь с достижением, предложи новый челлендж, добавь эмодзи. Без приветствия!`,
+        `${userName ? userName + ', ' : ''}Серия правильных ответов: ${userData.streak}. Слабая тема: ${weakTopic || 'нет'}. Сформулируй короткое мотивационное сообщение: похвали за серию, предложи не прерывать streak, добавь call-to-action и эмодзи. Без приветствия!`,
+        `${userName ? userName + ', ' : ''}Давно не было активности. Слабая тема: ${weakTopic || 'нет'}. Сформулируй короткое поддерживающее сообщение: мягко пригласи вернуться, предложи начать с легкого урока, добавь эмодзи. Без приветствия!`
+      ];
+      // Выбор шаблона по ситуации
+      let prompt;
+      if (daysBetween(userData.lastActiveDate, now) > 7) {
+        prompt = promptTemplates[5]; // давно не был активен
+      } else if (progressDynamics !== 0) {
+        prompt = promptTemplates[1]; // динамика
+      } else if (userData.streak >= 3) {
+        prompt = promptTemplates[4]; // streak
+      } else if (achievements.length > 0) {
+        prompt = promptTemplates[3]; // достижения
+      } else if (timeOfDay === 'утро' || timeOfDay === 'вечер') {
+        prompt = promptTemplates[2]; // время суток
+      } else {
+        // Случайный шаблон из первых трёх
+        prompt = promptTemplates[Math.floor(Math.random() * 3)];
+      }
 
       let message;
       try {
+        console.log('[CRON][AI] prompt:', prompt);
         message = await askCloudflareAI(prompt, env);
-        if (message.length > 220) message = message.slice(0, 220) + '...';
+        console.log('[CRON][AI] response:', message);
       } catch (e) {
         message = generateReminderMessage(userData); // fallback
       }

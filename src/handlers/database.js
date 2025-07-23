@@ -293,13 +293,19 @@ export class DatabaseManager {
 
         console.log(`[DatabaseManager] Created new user: ${chatId}`);
       } else {
-        // Обновляем время последней активности
-        console.log('[DatabaseManager] Updating user activity...');
+        // Обновляем время последней активности и данные профиля
+        const username = telegramUser?.username || null;
+        const firstName = telegramUser?.first_name || null;
+        const lastName = telegramUser?.last_name || null;
         await this.db.prepare(`
-          UPDATE users SET last_activity = CURRENT_TIMESTAMP
+          UPDATE users SET 
+            last_activity = CURRENT_TIMESTAMP,
+            username = ?,
+            first_name = ?,
+            last_name = ?
           WHERE chat_id = ?
-        `).bind(chatId).run();
-        console.log('[DatabaseManager] User activity updated');
+        `).bind(username, firstName, lastName, chatId).run();
+        console.log('[DatabaseManager] User activity and profile updated');
       }
 
       console.log('[DatabaseManager] initUser completed successfully');

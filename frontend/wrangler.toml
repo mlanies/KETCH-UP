@@ -15,4 +15,10 @@ FRONTEND_URL = "https://wine-app.2gc.ru"
 # Кастомный домен
 [[routes]]
 pattern = "wine-app.2gc.ru/*"
-zone_name = "2gc.ru" 
+zone_name = "2gc.ru"
+
+[env.admin.vars]
+CLOUDFLARE_ACCOUNT_ID = "073ae0130b7cee5e55a1ac1a335431a8"
+CLOUDFLARE_IMAGES_HASH = "tdcdGyOL6_eTEtlo-2Ihkw"
+CLOUDFLARE_IMAGES_BASE_URL = "https://imagedelivery.net/tdcdGyOL6_eTEtlo-2Ihkw"
+CLOUDFLARE_IMAGES_VARIANT = "public"
