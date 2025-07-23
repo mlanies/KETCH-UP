@@ -40,4 +40,18 @@ routes = [
   "https://wine-admin.2gc.ru/*"
 ]
 
-# Можно добавить отдельные переменные или использовать общие 
+# База данных для админ-бота (использует ту же базу)
+[[env.admin.d1_databases]]
+binding = "DB"
+database_name = "wine-bot-db"
+database_id = "4de41da1-d801-4e91-ab74-5107b445fb05"
+
+# Кэш для админ-бота (использует тот же кэш)
+[[env.admin.kv_namespaces]]
+binding = "WINE_CACHE"
+id = "e7107413f4a7434a8e9d101b337dc5d4"
+preview_id = "97d3cb4a1aee4074b673f3ad3e057375"
+
+# Переменные для админ-бота
+[env.admin.vars]
+WORKER_URL = "https://telegram-wine-bot-admin.2gc.workers.dev" 
