@@ -37,6 +37,38 @@ async function authorizeUser(chatId, env) {
 // Ожидание пароля (in-memory, сбрасывается при рестарте worker)
 const awaitingPassword = new Set();
 
+// Защита от перебора пароля
+const passwordAttempts = new Map(); // chatId -> { count, firstAttemptTs }
+const MAX_ATTEMPTS = 5;
+const BLOCK_TIME_MS = 10 * 60 * 1000; // 10 минут
+
+function isPasswordBlocked(chatId) {
+  const entry = passwordAttempts.get(chatId);
+  if (!entry) return false;
+  if (entry.count < MAX_ATTEMPTS) return false;
+  const now = Date.now();
+  if (now - entry.firstAttemptTs < BLOCK_TIME_MS) return true;
+  // Сбросить счетчик после блокировки
+  passwordAttempts.delete(chatId);
+  return false;
+}
+
+function recordPasswordAttempt(chatId) {
+  const now = Date.now();
+  let entry = passwordAttempts.get(chatId);
+  if (!entry) {
+    entry = { count: 1, firstAttemptTs: now };
+  } else {
+    if (now - entry.firstAttemptTs > BLOCK_TIME_MS) {
+      // Сбросить счетчик после истечения времени
+      entry = { count: 1, firstAttemptTs: now };
+    } else {
+      entry.count++;
+    }
+  }
+  passwordAttempts.set(chatId, entry);
+}
+
 // Обработка сообщений от администраторов
 async function handleAdminMessage(message, env) {
   const chatId = message.chat.id;
@@ -53,10 +85,16 @@ async function handleAdminMessage(message, env) {
       await telegram.sendMessage(chatId, '🔒 Введите пароль для доступа:');
       return;
     } else {
+      // Защита от перебора пароля
+      if (isPasswordBlocked(chatId)) {
+        await telegram.sendMessage(chatId, '⏳ Слишком много попыток. Попробуйте снова через 10 минут.');
+        return;
+      }
       // Ожидаем ввод пароля
       if (text.trim() === env.ADMIN_BOT_PASSWORD) {
         await authorizeUser(chatId, env); // Сохраняем chat_id как авторизованный
         awaitingPassword.delete(chatId);
+        passwordAttempts.delete(chatId); // сбросить счетчик
         // Удаляем сообщение пользователя с паролем
         try { await telegram.deleteMessage(chatId, message.message_id); } catch (e) { console.error('Failed to delete password message:', e); }
         await telegram.sendMessage(chatId, '✅ Доступ разрешён!');
@@ -65,9 +103,16 @@ async function handleAdminMessage(message, env) {
         await commands.handleStart(chatId);
         return;
       } else {
+        recordPasswordAttempt(chatId);
         // Удаляем сообщение пользователя с паролем
         try { await telegram.deleteMessage(chatId, message.message_id); } catch (e) { console.error('Failed to delete password message:', e); }
-        await telegram.sendMessage(chatId, '❌ Неверный пароль. Попробуйте ещё раз:');
+        const entry = passwordAttempts.get(chatId);
+        const attemptsLeft = Math.max(0, MAX_ATTEMPTS - (entry ? entry.count : 0));
+        if (attemptsLeft === 0) {
+          await telegram.sendMessage(chatId, '⏳ Слишком много попыток. Попробуйте снова через 10 минут.');
+        } else {
+          await telegram.sendMessage(chatId, `❌ Неверный пароль. Осталось попыток: ${attemptsLeft}. Попробуйте ещё раз:`);
+        }
         return;
       }
     }
