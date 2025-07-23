@@ -489,3 +489,5 @@ export function createWeeklyProgressChart(analytics) {
   
   return createProgressChart(weeklyData, 'Прогресс за неделю');
 } 
+
+export { getUserAnalytics }; 

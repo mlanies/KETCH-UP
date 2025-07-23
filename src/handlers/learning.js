@@ -925,16 +925,16 @@ export async function handleLearningCallback(data, chatId, messageId, env) {
     } else if (data === 'detailed_stats') {
       await showDetailedStats(chatId, env);
     } else if (data === 'feedback_like') {
+      await saveUserFeedback(chatId, 'like', null, null, env);
       await sendMessage(chatId, 'Спасибо за ваш отзыв! 😊', env);
-      // Здесь можно сохранить фидбек в базу/лог
       return;
     } else if (data === 'feedback_hard') {
+      await saveUserFeedback(chatId, 'hard', null, null, env);
       await sendMessage(chatId, 'Спасибо! Мы учтём, что вопросы были сложными.', env);
-      // Здесь можно сохранить фидбек в базу/лог
       return;
     } else if (data === 'feedback_easy') {
+      await saveUserFeedback(chatId, 'easy', null, null, env);
       await sendMessage(chatId, 'Спасибо! Мы постараемся сделать вопросы интереснее.', env);
-      // Здесь можно сохранить фидбек в базу/лог
       return;
     } else if (data === 'feedback_comment') {
       if (!env.__awaiting_feedback) env.__awaiting_feedback = {};
@@ -945,6 +945,61 @@ export async function handleLearningCallback(data, chatId, messageId, env) {
   } catch (error) {
     console.error('Learning callback error:', error);
     await sendMessage(chatId, 'Произошла ошибка в системе обучения. Попробуйте позже.', env);
+  }
+}
+
+// Сохранение отзыва пользователя в базу данных
+async function saveUserFeedback(chatId, feedbackType, feedbackText = null, sessionData = null, env) {
+  try {
+    const database = new DatabaseManager(env);
+    const db = database.db;
+    
+    // Получаем данные о последней сессии пользователя
+    let sessionType = 'unknown';
+    let questionCount = 0;
+    let correctAnswers = 0;
+    let sessionDuration = 0;
+    
+    if (sessionData) {
+      sessionType = sessionData.sessionType || 'unknown';
+      questionCount = sessionData.questionCount || 0;
+      correctAnswers = sessionData.correctAnswers || 0;
+      sessionDuration = sessionData.duration || 0;
+    } else {
+      // Получаем данные о последней сессии из базы
+      const lastSession = await db.prepare(`
+        SELECT session_type, total_questions, correct_answers, 
+               CAST((julianday(end_time) - julianday(start_time)) * 24 * 60 AS INTEGER) as duration_minutes
+        FROM learning_sessions
+        WHERE chat_id = ? AND end_time IS NOT NULL
+        ORDER BY end_time DESC
+        LIMIT 1
+      `).bind(chatId).first();
+      
+      if (lastSession) {
+        sessionType = lastSession.session_type;
+        questionCount = lastSession.total_questions;
+        correctAnswers = lastSession.correct_answers;
+        sessionDuration = lastSession.duration_minutes || 0;
+      }
+    }
+    
+    // Сохраняем отзыв в базу данных
+    await db.prepare(`
+      INSERT INTO user_feedback (
+        chat_id, feedback_type, feedback_text, session_type, 
+        question_count, correct_answers, session_duration_minutes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      chatId, feedbackType, feedbackText, sessionType,
+      questionCount, correctAnswers, sessionDuration
+    ).run();
+    
+    console.log(`[LEARNING] Saved feedback: ${feedbackType} from user ${chatId}`);
+    return true;
+  } catch (error) {
+    console.error('[LEARNING] Error saving feedback:', error);
+    return false;
   }
 }
 

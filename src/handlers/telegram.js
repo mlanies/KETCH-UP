@@ -115,7 +115,9 @@ export async function handleMessage(message, env) {
       return;
     } else if (env.__awaiting_feedback && env.__awaiting_feedback[chatId]) {
       env.__awaiting_feedback[chatId] = false;
-      // Здесь можно сохранить text как фидбек (например, в базу или лог)
+      // Сохраняем комментарий пользователя в базу данных
+      const { saveUserFeedback } = await import('./learning.js');
+      await saveUserFeedback(chatId, 'comment', text, null, env);
       await sendMessage(chatId, 'Спасибо за ваш подробный отзыв!', env);
       return;
     } else {
