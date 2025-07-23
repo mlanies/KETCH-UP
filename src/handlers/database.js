@@ -1130,4 +1130,56 @@ export class DatabaseManager {
     const xpNow = xpNowResult?.experience_points || 0;
     return xpNow - xpWeekAgo;
   }
+
+  // Получить предпочтительное время мотивации пользователя
+  async getPreferredMotivationTime(chatId) {
+    try {
+      const result = await this.db.prepare(
+        'SELECT preferred_motivation_time FROM users WHERE chat_id = ?'
+      ).bind(chatId).first();
+      return result ? result.preferred_motivation_time : null;
+    } catch (error) {
+      console.error('[DatabaseManager] Error getting preferred_motivation_time:', error);
+      return null;
+    }
+  }
+
+  // Установить предпочтительное время мотивации пользователя
+  async setPreferredMotivationTime(chatId, time) {
+    try {
+      await this.db.prepare(
+        'UPDATE users SET preferred_motivation_time = ? WHERE chat_id = ?'
+      ).bind(time, chatId).run();
+      return true;
+    } catch (error) {
+      console.error('[DatabaseManager] Error setting preferred_motivation_time:', error);
+      return false;
+    }
+  }
+
+  // Получить флаг motivation_enabled
+  async getMotivationEnabled(chatId) {
+    try {
+      const result = await this.db.prepare(
+        'SELECT motivation_enabled FROM users WHERE chat_id = ?'
+      ).bind(chatId).first();
+      return result ? Boolean(result.motivation_enabled) : true;
+    } catch (error) {
+      console.error('[DatabaseManager] Error getting motivation_enabled:', error);
+      return true;
+    }
+  }
+
+  // Установить флаг motivation_enabled
+  async setMotivationEnabled(chatId, enabled) {
+    try {
+      await this.db.prepare(
+        'UPDATE users SET motivation_enabled = ? WHERE chat_id = ?'
+      ).bind(enabled ? 1 : 0, chatId).run();
+      return true;
+    } catch (error) {
+      console.error('[DatabaseManager] Error setting motivation_enabled:', error);
+      return false;
+    }
+  }
 } 

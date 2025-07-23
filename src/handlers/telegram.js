@@ -134,6 +134,16 @@ export async function handleMessage(message, env) {
       await sendMessage(chatId, 'Спасибо за ваш подробный отзыв!', env);
       await startLearning(chatId, env);
       return;
+    } else if (text === '/motivation_on') {
+      const { DatabaseManager } = await import('./database.js');
+      const database = new DatabaseManager(env);
+      await database.setMotivationEnabled(chatId, true);
+      await sendMessage(chatId, '✅ Мотивационные сообщения включены. Вы будете получать персональные напоминания и советы!', env);
+    } else if (text === '/motivation_off') {
+      const { DatabaseManager } = await import('./database.js');
+      const database = new DatabaseManager(env);
+      await database.setMotivationEnabled(chatId, false);
+      await sendMessage(chatId, '🔕 Мотивационные сообщения отключены. Вы не будете получать напоминания и мотивацию.', env);
     } else {
       // Поиск по названию вина
       await searchWineByName(text, chatId, env);

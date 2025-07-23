@@ -15,6 +15,8 @@ import {
 import { DatabaseManager } from './database.js';
 import { AchievementSystem } from './achievements.js';
 import { DailyChallengeSystem } from './dailyChallenges.js';
+import { ChallengeSystem, CHALLENGE_PERIODS } from './challenges.js';
+import { generateAdviceForWeakTopics } from './ai.js';
 
 // Состояния обучения для каждого пользователя
 const learningStates = new Map();
@@ -732,6 +734,18 @@ async function finishLesson(chatId, env) {
   // Кнопка AI-режима для продвинутых
   const aiModeButton = (accuracy > 0.8 && totalQuestions > 20) ? [[{ text: '🤖 ИИ-режим', callback_data: 'learning_ai_mode' }]] : [];
 
+  // Отправляем AI-совет по слабой теме, если есть
+  if (weakCategories.length > 0) {
+    try {
+      const weakTopic = weakCategories[0];
+      const userStats = { accuracy, totalQuestions };
+      const aiAdvice = await generateAdviceForWeakTopics(chatId, weakTopic, env, userStats);
+      await sendMessage(chatId, `💡 Персональный совет по теме "${weakTopic}":\n${aiAdvice}`, env);
+    } catch (e) {
+      console.error('AI advice error:', e);
+    }
+  }
+
   // Основные кнопки
   const mainButtons = [
     [{ text: '🎯 Быстрый тест', callback_data: 'learning_quick_test' }],
@@ -777,6 +791,45 @@ async function finishLesson(chatId, env) {
     ]
   };
   await sendMessageWithKeyboard(chatId, '🗣️ *Обратная связь*\nЧто было сложно/понравилось? Выберите вариант или напишите свой комментарий.', feedbackKeyboard, env);
+
+  // Обновляем прогресс по еженедельным/ежемесячным челленджам
+  try {
+    const challengeSystem = new ChallengeSystem(database, env);
+    // Получаем челленджи пользователя (weekly + monthly)
+    const weeklyChallenges = await challengeSystem.getUserChallenges(chatId, CHALLENGE_PERIODS.WEEKLY);
+    const monthlyChallenges = await challengeSystem.getUserChallenges(chatId, CHALLENGE_PERIODS.MONTHLY);
+    const allChallenges = [...weeklyChallenges, ...monthlyChallenges];
+    for (const challenge of allChallenges) {
+      if (challenge.completed) continue;
+      // Пример: обновляем прогресс по типу челленджа
+      if (challenge.type === 'lessons') {
+        // Увеличиваем прогресс на 1 за каждый завершенный урок
+        await challengeSystem.updateChallengeProgress(chatId, challenge.id, (challenge.progress || 0) + 1);
+        // Если достигнут таргет — завершаем челлендж
+        if ((challenge.progress || 0) + 1 >= challenge.target) {
+          await challengeSystem.completeChallenge(chatId, challenge.id);
+        }
+      }
+      if (challenge.type === 'streak') {
+        // Проверяем streak пользователя
+        const user = await database.getUser(chatId);
+        if (user && user.learning_streak >= challenge.target) {
+          await challengeSystem.updateChallengeProgress(chatId, challenge.id, user.learning_streak);
+          await challengeSystem.completeChallenge(chatId, challenge.id);
+        }
+      }
+      if (challenge.type === 'accuracy') {
+        // Проверяем точность за период (пример: за месяц)
+        const accuracy = state.totalQuestions > 0 ? state.correctAnswers / state.totalQuestions : 0;
+        await challengeSystem.updateChallengeProgress(chatId, challenge.id, accuracy);
+        if (accuracy >= challenge.target) {
+          await challengeSystem.completeChallenge(chatId, challenge.id);
+        }
+      }
+    }
+  } catch (e) {
+    console.error('ChallengeSystem integration error:', e);
+  }
 }
 
 // Получение оценки

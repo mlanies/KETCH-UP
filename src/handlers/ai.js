@@ -1032,3 +1032,75 @@ export async function testAI(request, env) {
     }, 500);
   }
 } 
+
+// Генерация AI-совета по слабой теме пользователя
+export async function generateAdviceForWeakTopics(chatId, weakTopic, env, userStats = {}) {
+  try {
+    const prompt = `Пользователь испытывает трудности по теме: ${weakTopic}. Его статистика: ${JSON.stringify(userStats)}. Дай короткий персональный совет, как улучшить результат по этой теме.`;
+    let aiAdvice = '';
+    if (env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_AI_TOKEN) {
+      const endpoint = `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/ai/run/@cf/meta/llama-3-8b-instruct`;
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${env.CLOUDFLARE_AI_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ prompt })
+      });
+      const data = await response.json();
+      if (data.result && data.result.response) {
+        aiAdvice = data.result.response.trim();
+      }
+    }
+    if (!aiAdvice) {
+      aiAdvice = `Совет: попробуйте повторить материал по теме "${weakTopic}" и пройти дополнительные тесты.`;
+    }
+    // Сохраняем совет в advice_history
+    if (env.DB) {
+      await env.DB.prepare(
+        'INSERT INTO advice_history (user_id, topic, advice) VALUES (?, ?, ?)'
+      ).bind(chatId, weakTopic, aiAdvice).run();
+    }
+    return aiAdvice;
+  } catch (e) {
+    console.error('generateAdviceForWeakTopics error:', e);
+    return `Совет: повторите материал по теме "${weakTopic}" и обратитесь к дополнительным источникам.`;
+  }
+} 
+
+// Генерация AI-ответа на обратную связь пользователя
+export async function generateAIResponseToFeedback(chatId, feedbackComment, env, userStats = {}) {
+  try {
+    const prompt = `Пользователь оставил отзыв: "${feedbackComment}". Его статистика: ${JSON.stringify(userStats)}. Скажи спасибо за отзыв и дай персональный совет или пожелание.`;
+    let aiResponse = '';
+    if (env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_AI_TOKEN) {
+      const endpoint = `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/ai/run/@cf/meta/llama-3-8b-instruct`;
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${env.CLOUDFLARE_AI_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ prompt })
+      });
+      const data = await response.json();
+      if (data.result && data.result.response) {
+        aiResponse = data.result.response.trim();
+      }
+    }
+    if (!aiResponse) {
+      aiResponse = `Спасибо за ваш отзыв! Продолжайте учиться и совершенствоваться — успехов!`;
+    }
+    // Сохраняем ответ в feedback_ai_responses
+    if (env.DB) {
+      await env.DB.prepare(
+        'INSERT INTO feedback_ai_responses (user_id, feedback_comment, ai_response) VALUES (?, ?, ?)'
+      ).bind(chatId, feedbackComment, aiResponse).run();
+    }
+    return aiResponse;
+  } catch (e) {
+    console.error('generateAIResponseToFeedback error:', e);
+    return `Спасибо за ваш отзыв! Продолжайте учиться и совершенствоваться!`;
+  }
+} 

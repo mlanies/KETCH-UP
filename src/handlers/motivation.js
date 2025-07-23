@@ -9,14 +9,28 @@ export class MotivationSystem {
   // Анализ поведения пользователя и генерация персонализированной мотивации
   async analyzeUserAndMotivate(chatId) {
     try {
+      // Проверяем, включена ли мотивация для пользователя
+      const motivationEnabled = await this.db.getMotivationEnabled(chatId);
+      if (!motivationEnabled) {
+        return {
+          success: false,
+          error: 'Мотивация отключена пользователем'
+        };
+      }
+
       // Получаем все данные пользователя
       const userData = await this.getComprehensiveUserData(chatId);
       
       // Анализируем поведение
       const behaviorAnalysis = await this.analyzeBehavior(userData);
       
+      // Обновляем предпочтительное время мотивации, если оно изменилось
+      if (behaviorAnalysis.preferredTime) {
+        await this.db.setPreferredMotivationTime(chatId, behaviorAnalysis.preferredTime);
+      }
+
       // Генерируем мотивационное сообщение
-      const motivationMessage = await this.generateMotivationMessage(userData, behaviorAnalysis);
+      const motivationMessage = await this.generateMotivationMessage(userData, behaviorAnalysis, chatId);
       
       // Сохраняем анализ в БД
       await this.saveAnalysis(chatId, behaviorAnalysis);
@@ -311,40 +325,83 @@ export class MotivationSystem {
     return Object.entries(hourCounts).reduce((a, b) => a[1] > b[1] ? a : b)[0];
   }
 
-  // Генерация мотивационного сообщения
-  async generateMotivationMessage(userData, analysis) {
+  // Модифицированная генерация мотивационного сообщения с учетом истории
+  async generateMotivationMessage(userData, analysis, chatId) {
     const { user, achievements, dailyChallenges } = userData;
     const { activity, progress, strengthsWeaknesses, motivation } = analysis;
-    
+
     let messageType = 'encouragement';
     let messageText = '';
-    
+    let templates = [];
+    let usedMessages = [];
+
+    // Получаем последние мотивационные сообщения пользователя
+    if (chatId) {
+      usedMessages = await this.getRecentMotivationHistory(chatId, 5);
+    }
+
     // Определяем тип сообщения на основе анализа
     if (motivation.level < 40) {
       messageType = 'encouragement';
-      messageText = this.generateEncouragementMessage(user, analysis);
+      templates = [
+        `Вижу, что ты давно не заходил. Знаешь, даже 5 минут в день могут изменить твои знания о напитках! Попробуй быстрый тест — это займет всего пару минут.`,
+        `🍷 Твои коллеги уже улучшают свои навыки. Не отставай! Пройди один тест сегодня — и ты будешь на шаг ближе к новому достижению.`,
+        `🌟 Каждый эксперт когда-то был новичком. Ты уже на ${user?.difficulty_level || 1} уровне — это отличный старт! Продолжай в том же духе.`
+      ];
     } else if (progress.isImproving && progress.progressRate > 20) {
       messageType = 'praise';
-      messageText = this.generatePraiseMessage(user, analysis);
+      templates = [
+        `🎉 Отличная работа! Твой прогресс впечатляет! Ты улучшился на ${Math.round(progress.progressRate)}% за последнее время. Продолжай в том же духе!`,
+        `🏆 Поздравляю! Ты показываешь отличные результаты. Твой streak: ${user?.learning_streak || 0} дней! Ты настоящий профессионал!`,
+        `⭐ Потрясающе! Ты не только учишься, но и делаешь это эффективно. Твой опыт: ${user?.experience_points || 0} XP — это говорит о твоей целеустремленности!`
+      ];
     } else if (activity.recentSessionsCount === 0) {
       messageType = 'reminder';
-      messageText = this.generateReminderMessage(user, analysis);
+      templates = [
+        `⏰ Не забывай о своих целях! У тебя есть ${user?.learning_streak || 0} дней streak — не прерывай его! Пройди тест сегодня.`,
+        `📚 Эй! Твои знания о напитках ждут обновления! Зайди на 5 минут — пройди быстрый тест и получи опыт.`,
+        `🎯 Напоминание: каждый день обучения делает тебя лучше! Ты уже на ${user?.difficulty_level || 1} уровне — не останавливайся!`
+      ];
     } else if (strengthsWeaknesses.weaknesses.length > 0) {
       messageType = 'challenge';
-      messageText = this.generateChallengeMessage(user, analysis);
+      const weakCategory = strengthsWeaknesses.weaknesses[0];
+      templates = [
+        `🎯 Вызов принят? У тебя есть слабое место: ${weakCategory.category || 'неизвестной категории'}. Пройди тест по этой категории и улучши свои навыки!`,
+        `⚡ Готов к вызову? Твоя точность в ${weakCategory.category || 'неизвестной категории'}: ${Math.round(weakCategory.accuracy || 0)}%. Попробуй улучшить этот результат!`,
+        `🔥 Время для роста! ${weakCategory.category || 'неизвестной категории'} требует внимания. Пройди специализированный тест и стань экспертом!`
+      ];
     } else {
       messageType = 'motivation';
-      messageText = this.generateGeneralMotivationMessage(user, analysis);
+      templates = [
+        `🚀 Ты на правильном пути! Каждый тест приближает тебя к новому уровню. До следующего уровня осталось ${this.calculateXPToNextLevel(user)} XP.`,
+        `💪 Отличная работа! Ты показываешь стабильный прогресс. Продолжай учиться — твои знания бесценны!`,
+        `🌟 Ты делаешь всё правильно! Обучение — это инвестиция в себя. Твои клиенты оценят твою экспертизу!`
+      ];
     }
-    
+
+    // Исключаем последние использованные сообщения
+    const availableTemplates = templates.filter(t => !usedMessages.includes(t));
+    if (availableTemplates.length > 0) {
+      messageText = availableTemplates[Math.floor(Math.random() * availableTemplates.length)];
+    } else {
+      // Если все шаблоны уже были — используем случайный
+      messageText = templates[Math.floor(Math.random() * templates.length)];
+    }
+
+    // Сохраняем сообщение в историю и чистим старые
+    if (chatId) {
+      await this.saveMotivationToHistory(chatId, messageText);
+      await this.cleanupOldMotivationHistory(chatId, 5);
+    }
+
     return {
       type: messageType,
       text: messageText,
       priority: this.calculateMessagePriority(messageType, analysis),
       context: {
-        userLevel: user.difficulty_level,
-        experiencePoints: user.experience_points,
-        streak: user.learning_streak,
+        userLevel: user?.difficulty_level,
+        experiencePoints: user?.experience_points,
+        streak: user?.learning_streak,
         analysis: analysis
       }
     };
@@ -590,5 +647,29 @@ export class MotivationSystem {
     const currentLevel = levels.findIndex(level => user.experience_points < level);
     if (currentLevel === -1) return 0;
     return levels[currentLevel] - user.experience_points;
+  }
+
+  // Получить последние N мотивационных сообщений пользователя
+  async getRecentMotivationHistory(chatId, limit = 5) {
+    const result = await this.db.prepare(
+      'SELECT message FROM motivation_history WHERE user_id = ? ORDER BY created_at DESC LIMIT ?'
+    ).bind(chatId, limit).all();
+    return (result.results || []).map(r => r.message);
+  }
+
+  // Сохранить мотивационное сообщение в историю
+  async saveMotivationToHistory(chatId, message) {
+    await this.db.prepare(
+      'INSERT INTO motivation_history (user_id, message) VALUES (?, ?)'
+    ).bind(chatId, message).run();
+  }
+
+  // Очистить старые сообщения, оставив только последние N
+  async cleanupOldMotivationHistory(chatId, keep = 5) {
+    await this.db.prepare(
+      `DELETE FROM motivation_history WHERE user_id = ? AND id NOT IN (
+        SELECT id FROM motivation_history WHERE user_id = ? ORDER BY created_at DESC LIMIT ?
+      )`
+    ).bind(chatId, chatId, keep).run();
   }
 } 
