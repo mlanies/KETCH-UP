@@ -389,4 +389,94 @@ export class UsersHandler {
 
     return message;
   }
+
+  // Блокировка пользователя
+  async blockUser(chatId) {
+    try {
+      const db = this.database.db;
+      await db.prepare(`UPDATE users SET is_blocked = TRUE WHERE chat_id = ?`).bind(chatId).run();
+      return { success: true };
+    } catch (error) {
+      console.error('[USERS] Error blocking user:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Разблокировка пользователя
+  async unblockUser(chatId) {
+    try {
+      const db = this.database.db;
+      await db.prepare(`UPDATE users SET is_blocked = FALSE WHERE chat_id = ?`).bind(chatId).run();
+      return { success: true };
+    } catch (error) {
+      console.error('[USERS] Error unblocking user:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Массовая блокировка пользователей
+  async blockUsers(chatIds) {
+    try {
+      const db = this.database.db;
+      for (const id of chatIds) {
+        await db.prepare(`UPDATE users SET is_blocked = TRUE WHERE chat_id = ?`).bind(id).run();
+      }
+      return { success: true };
+    } catch (error) {
+      console.error('[USERS] Error blocking users:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Массовая разблокировка пользователей
+  async unblockUsers(chatIds) {
+    try {
+      const db = this.database.db;
+      for (const id of chatIds) {
+        await db.prepare(`UPDATE users SET is_blocked = FALSE WHERE chat_id = ?`).bind(id).run();
+      }
+      return { success: true };
+    } catch (error) {
+      console.error('[USERS] Error unblocking users:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Сброс прогресса пользователя
+  async resetUserProgress(chatId) {
+    try {
+      const db = this.database.db;
+      // Сбросить основные поля
+      await db.prepare(`UPDATE users SET total_score = 0, total_questions = 0, total_correct = 0, learning_streak = 0, max_streak = 0, experience_points = 0, consecutive_days = 0, last_learning_date = NULL WHERE chat_id = ?`).bind(chatId).run();
+      // Сбросить статистику по категориям
+      await db.prepare(`DELETE FROM category_stats WHERE chat_id = ?`).bind(chatId).run();
+      // Сбросить статистику по типам вопросов
+      await db.prepare(`DELETE FROM question_type_stats WHERE chat_id = ?`).bind(chatId).run();
+      // Сбросить достижения
+      await db.prepare(`DELETE FROM achievements WHERE chat_id = ?`).bind(chatId).run();
+      // Сбросить сессии
+      await db.prepare(`DELETE FROM learning_sessions WHERE chat_id = ?`).bind(chatId).run();
+      // Сбросить ответы
+      await db.prepare(`DELETE FROM user_answers WHERE chat_id = ?`).bind(chatId).run();
+      // Сбросить ежедневные задания
+      await db.prepare(`DELETE FROM daily_challenges WHERE chat_id = ?`).bind(chatId).run();
+      return { success: true };
+    } catch (error) {
+      console.error('[USERS] Error resetting user progress:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Массовый сброс прогресса пользователей
+  async resetUsersProgress(chatIds) {
+    try {
+      for (const id of chatIds) {
+        await this.resetUserProgress(id);
+      }
+      return { success: true };
+    } catch (error) {
+      console.error('[USERS] Error resetting users progress:', error);
+      return { success: false, error: error.message };
+    }
+  }
 } 

@@ -186,6 +186,13 @@ export class CommandsHandler {
       
       const keyboard = this.telegram.createInlineKeyboard([
         [
+          { text: '🚫 Заблокировать', callback_data: `admin_block_user_${userId}` },
+          { text: '✅ Разблокировать', callback_data: `admin_unblock_user_${userId}` }
+        ],
+        [
+          { text: '🔄 Сбросить прогресс', callback_data: `admin_reset_user_${userId}` }
+        ],
+        [
           { text: '🔙 Назад к пользователям', callback_data: 'admin_users' }
         ]
       ]);
@@ -231,6 +238,163 @@ export class CommandsHandler {
     } catch (error) {
       console.error('[COMMANDS] Error in handleSearchUser:', error);
       await this.telegram.sendMessage(chatId, '❌ Произошла ошибка при поиске пользователей');
+    }
+  }
+
+  // Обработка команды /block_user
+  async handleBlockUser(chatId, args) {
+    if (!args || args.length === 0) {
+      await this.telegram.sendMessage(chatId, '❌ Укажите ID пользователя: /block_user <ID>');
+      return;
+    }
+    const userId = parseInt(args[0]);
+    if (isNaN(userId)) {
+      await this.telegram.sendMessage(chatId, '❌ Неверный ID пользователя');
+      return;
+    }
+    try {
+      const result = await this.users.blockUser(userId);
+      if (result.success) {
+        await this.telegram.sendMessage(chatId, `🚫 Пользователь ${userId} заблокирован.`);
+      } else {
+        await this.telegram.sendMessage(chatId, `❌ Ошибка блокировки: ${result.error}`);
+      }
+    } catch (error) {
+      await this.telegram.sendMessage(chatId, '❌ Произошла ошибка при блокировке пользователя');
+    }
+  }
+
+  // Обработка команды /unblock_user
+  async handleUnblockUser(chatId, args) {
+    if (!args || args.length === 0) {
+      await this.telegram.sendMessage(chatId, '❌ Укажите ID пользователя: /unblock_user <ID>');
+      return;
+    }
+    const userId = parseInt(args[0]);
+    if (isNaN(userId)) {
+      await this.telegram.sendMessage(chatId, '❌ Неверный ID пользователя');
+      return;
+    }
+    try {
+      const result = await this.users.unblockUser(userId);
+      if (result.success) {
+        await this.telegram.sendMessage(chatId, `✅ Пользователь ${userId} разблокирован.`);
+      } else {
+        await this.telegram.sendMessage(chatId, `❌ Ошибка разблокировки: ${result.error}`);
+      }
+    } catch (error) {
+      await this.telegram.sendMessage(chatId, '❌ Произошла ошибка при разблокировке пользователя');
+    }
+  }
+
+  // Обработка команды /reset_user
+  async handleResetUser(chatId, args) {
+    if (!args || args.length === 0) {
+      await this.telegram.sendMessage(chatId, '❌ Укажите ID пользователя: /reset_user <ID>');
+      return;
+    }
+    const userId = parseInt(args[0]);
+    if (isNaN(userId)) {
+      await this.telegram.sendMessage(chatId, '❌ Неверный ID пользователя');
+      return;
+    }
+    try {
+      const result = await this.users.resetUserProgress(userId);
+      if (result.success) {
+        await this.telegram.sendMessage(chatId, `🔄 Прогресс пользователя ${userId} сброшен.`);
+      } else {
+        await this.telegram.sendMessage(chatId, `❌ Ошибка сброса: ${result.error}`);
+      }
+    } catch (error) {
+      await this.telegram.sendMessage(chatId, '❌ Произошла ошибка при сбросе прогресса пользователя');
+    }
+  }
+
+  // Массовая рассылка сообщений
+  async handleBroadcast(chatId, args) {
+    if (!args || args.length === 0) {
+      await this.telegram.sendMessage(chatId, '❌ Укажите текст для рассылки: /broadcast <текст>');
+      return;
+    }
+    const text = args.join(' ');
+    try {
+      const usersResult = await this.users.getUsersList(1000); // до 1000 пользователей
+      if (!usersResult.success) {
+        await this.telegram.sendMessage(chatId, `❌ Ошибка получения пользователей: ${usersResult.error}`);
+        return;
+      }
+      const users = usersResult.data.filter(u => !u.is_blocked);
+      let sent = 0, failed = 0;
+      for (const user of users) {
+        try {
+          await this.telegram.sendMessage(user.chat_id, text);
+          sent++;
+        } catch (e) {
+          failed++;
+        }
+        // Пауза для обхода лимитов Telegram
+        await new Promise(r => setTimeout(r, 40));
+      }
+      await this.telegram.sendMessage(chatId, `✅ Рассылка завершена. Успешно: ${sent}, ошибок: ${failed}`);
+    } catch (error) {
+      await this.telegram.sendMessage(chatId, '❌ Произошла ошибка при рассылке сообщений');
+    }
+  }
+
+  // Добавить обработку команды /broadcast
+  async handleMessage(chatId, text) {
+    if (text.startsWith('/broadcast')) {
+      const args = text.split(' ').slice(1);
+      await this.handleBroadcast(chatId, args);
+      return true;
+    }
+    return false;
+  }
+
+  // Ответить на отзыв
+  async handleReplyFeedback(chatId, args) {
+    if (!args || args.length < 2) {
+      await this.telegram.sendMessage(chatId, '❌ Используйте: /reply_feedback <feedback_id> <текст>');
+      return;
+    }
+    const feedbackId = parseInt(args[0]);
+    if (isNaN(feedbackId)) {
+      await this.telegram.sendMessage(chatId, '❌ Неверный ID отзыва');
+      return;
+    }
+    const text = args.slice(1).join(' ');
+    try {
+      const result = await this.feedback.replyToFeedback(feedbackId, text);
+      if (result.success) {
+        await this.telegram.sendMessage(chatId, `✅ Ответ отправлен пользователю.`);
+      } else {
+        await this.telegram.sendMessage(chatId, `❌ Ошибка отправки: ${result.error}`);
+      }
+    } catch (error) {
+      await this.telegram.sendMessage(chatId, '❌ Произошла ошибка при отправке ответа');
+    }
+  }
+
+  // Отметить отзыв как обработанный
+  async handleMarkFeedbackProcessed(chatId, args) {
+    if (!args || args.length === 0) {
+      await this.telegram.sendMessage(chatId, '❌ Укажите ID отзыва: /mark_feedback <feedback_id>');
+      return;
+    }
+    const feedbackId = parseInt(args[0]);
+    if (isNaN(feedbackId)) {
+      await this.telegram.sendMessage(chatId, '❌ Неверный ID отзыва');
+      return;
+    }
+    try {
+      const result = await this.feedback.markFeedbackProcessed(feedbackId);
+      if (result.success) {
+        await this.telegram.sendMessage(chatId, `✅ Отзыв ${feedbackId} отмечен как обработанный.`);
+      } else {
+        await this.telegram.sendMessage(chatId, `❌ Ошибка: ${result.error}`);
+      }
+    } catch (error) {
+      await this.telegram.sendMessage(chatId, '❌ Произошла ошибка при отметке отзыва');
     }
   }
 
@@ -307,6 +471,21 @@ export class CommandsHandler {
             await this.telegram.sendMessage(chatId, '❌ ID пользователя не указан');
           }
           break;
+        case fullAction.startsWith('block_user_'):
+          await this.handleBlockUser(chatId, [fullAction.replace('block_user_', '')]);
+          break;
+        case fullAction.startsWith('unblock_user_'):
+          await this.handleUnblockUser(chatId, [fullAction.replace('unblock_user_', '')]);
+          break;
+        case fullAction.startsWith('reset_user_'):
+          await this.handleResetUser(chatId, [fullAction.replace('reset_user_', '')]);
+          break;
+        case fullAction.startsWith('reply_feedback_'):
+          await this.handleReplyFeedback(chatId, [fullAction.replace('reply_feedback_', '')]);
+          break;
+        case fullAction.startsWith('mark_feedback_'):
+          await this.handleMarkFeedbackProcessed(chatId, [fullAction.replace('mark_feedback_', '')]);
+          break;
         case fullAction === 'help':
           await this.handleHelp(chatId);
           break;
@@ -369,24 +548,25 @@ export class CommandsHandler {
     }
   }
 
+  // В детальном просмотре отзыва добавить кнопки
   async handleFeedbackDetailed(chatId) {
     try {
       const feedback = await this.feedback.getDetailedFeedback(10);
-      
       if (!feedback.success) {
         await this.telegram.sendMessage(chatId, `❌ Ошибка получения детальных отзывов: ${feedback.error}`);
         return;
       }
-
-      const message = this.feedback.formatDetailedFeedback(feedback.data);
-      
-      const keyboard = this.telegram.createInlineKeyboard([
-        [
-          { text: '🔙 Назад к отзывам', callback_data: 'admin_feedback' }
-        ]
-      ]);
-
-      await this.telegram.sendMessageWithKeyboard(chatId, message, keyboard);
+      // Для каждого отзыва добавить кнопки "Ответить" и "Обработано"
+      for (const item of feedback.data) {
+        const message = this.feedback.formatDetailedFeedback([item]);
+        const keyboard = this.telegram.createInlineKeyboard([
+          [
+            { text: '✉️ Ответить', callback_data: `admin_reply_feedback_${item.id}` },
+            { text: '✅ Обработано', callback_data: `admin_mark_feedback_${item.id}` }
+          ]
+        ]);
+        await this.telegram.sendMessageWithKeyboard(chatId, message, keyboard);
+      }
     } catch (error) {
       console.error('[COMMANDS] Error in handleFeedbackDetailed:', error);
       await this.telegram.sendMessage(chatId, '❌ Произошла ошибка при получении детальных отзывов');

@@ -75,6 +75,9 @@ async function handleAdminMessage(message, env) {
 
   try {
     const commands = new CommandsHandler(env);
+    // Обработка массовых команд (например, /broadcast)
+    const handled = await commands.handleMessage(chatId, text);
+    if (handled) return;
     // Обработка команд
     if (text === '/start' || text === '/help') {
       await commands.handleStart(chatId);

@@ -153,6 +153,48 @@ export class FeedbackHandler {
     }
   }
 
+  // Отметить отзыв как обработанный
+  async markFeedbackProcessed(feedbackId) {
+    try {
+      const db = this.database.db;
+      await db.prepare(`UPDATE user_feedback SET is_processed = TRUE WHERE id = ?`).bind(feedbackId).run();
+      return { success: true };
+    } catch (error) {
+      console.error('[FEEDBACK] Error marking feedback processed:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Ответить на отзыв (отправить сообщение пользователю)
+  async replyToFeedback(feedbackId, text) {
+    try {
+      const db = this.database.db;
+      const feedback = await db.prepare(`SELECT chat_id FROM user_feedback WHERE id = ?`).bind(feedbackId).first();
+      if (!feedback || !feedback.chat_id) {
+        return { success: false, error: 'Пользователь не найден для этого отзыва' };
+      }
+      await this.telegram.sendMessage(feedback.chat_id, text);
+      return { success: true };
+    } catch (error) {
+      console.error('[FEEDBACK] Error replying to feedback:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Массовая отметка отзывов как обработанных
+  async markFeedbacksProcessed(feedbackIds) {
+    try {
+      const db = this.database.db;
+      for (const id of feedbackIds) {
+        await db.prepare(`UPDATE user_feedback SET is_processed = TRUE WHERE id = ?`).bind(id).run();
+      }
+      return { success: true };
+    } catch (error) {
+      console.error('[FEEDBACK] Error marking feedbacks processed:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   // Форматирование отзывов для Telegram
   formatFeedbackStats(stats) {
     const { stats: feedbackStats, recent, sessions } = stats;
