@@ -49,4 +49,5 @@ preview_id = "97d3cb4a1aee4074b673f3ad3e057375"
 
 # Переменные для админ-бота
 [env.admin.vars]
-WORKER_URL = "https://telegram-wine-bot-admin.2gc.workers.dev" 
+WORKER_URL = "https://telegram-wine-bot-admin.2gc.workers.dev"
+migrations_dir = "./migrations"
