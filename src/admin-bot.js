@@ -260,4 +260,10 @@ export async function handleAdminWebhook(request, env) {
 }
 
 // Экспорт для Cloudflare Workers
-export default { fetch: handleAdminWebhook }; 
+export default { fetch: handleAdminWebhook };
+
+// Экспортируемая функция для cron (Cloudflare Workers)
+export async function scheduled(event, env, ctx) {
+  console.log('[ADMIN BOT] scheduled() triggered by cron');
+  // Здесь можно вызвать функцию рассылки, если потребуется
+} 

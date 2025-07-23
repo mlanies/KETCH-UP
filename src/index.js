@@ -1182,35 +1182,36 @@ async function sendLearningReminders(env) {
   const timeOfDay = getTimeOfDay(now);
 
   for (const user of users) {
-    const stats = await db.getUserStats(user.chatId);
-    const userData = {
-      chatId: user.chatId,
-      lastLearningDate: user.lastLearningDate,
-      lastActiveDate: user.lastActiveDate,
-      level: stats?.user?.level || 1,
-      levelName: stats?.user?.level_name || '',
-      progress: stats?.user?.progress || 0,
-      streak: stats?.user?.learning_streak || 0,
-      maxStreak: stats?.user?.max_streak || 0,
-      errors: stats?.user?.total_questions && stats?.user?.total_questions > 0 ? (stats?.user?.total_questions - stats?.user?.total_correct) : 0,
-      totalQuestions: stats?.user?.total_questions || 0,
-      totalCorrect: stats?.user?.total_correct || 0,
-      lastTopics: stats?.categoryStats?.slice(0, 2).map(c => c.category) || [],
-      weakTopics: stats?.categoryStats?.filter(c => c.accuracy < 60).map(c => c.category) || [],
-      strongTopics: stats?.categoryStats?.filter(c => c.accuracy > 80).map(c => c.category) || [],
-    };
-    const lastMotivationSent = await db.getLastMotivationSent(user.chatId);
-    if (!shouldSendMotivation(userData, now, lastMotivationSent)) continue;
+    try {
+      const stats = await db.getUserStats(user.chatId);
+      const userData = {
+        chatId: user.chatId,
+        lastLearningDate: user.lastLearningDate,
+        lastActiveDate: user.lastActiveDate,
+        level: stats?.user?.level || 1,
+        levelName: stats?.user?.level_name || '',
+        progress: stats?.user?.progress || 0,
+        streak: stats?.user?.learning_streak || 0,
+        maxStreak: stats?.user?.max_streak || 0,
+        errors: stats?.user?.total_questions && stats?.user?.total_questions > 0 ? (stats?.user?.total_questions - stats?.user?.total_correct) : 0,
+        totalQuestions: stats?.user?.total_questions || 0,
+        totalCorrect: stats?.user?.total_correct || 0,
+        lastTopics: stats?.categoryStats?.slice(0, 2).map(c => c.category) || [],
+        weakTopics: stats?.categoryStats?.filter(c => c.accuracy < 60).map(c => c.category) || [],
+        strongTopics: stats?.categoryStats?.filter(c => c.accuracy > 80).map(c => c.category) || [],
+      };
+      const lastMotivationSent = await db.getLastMotivationSent(user.chatId);
+      if (!shouldSendMotivation(userData, now, lastMotivationSent)) continue;
 
-    // Новое: достижения, динамика, любимая тема
-    const achievements = await db.getRecentAchievements(user.chatId, 3);
-    const progressDynamics = await db.getProgressDynamics(user.chatId);
-    const favoriteTopic = userData.strongTopics[0] || userData.lastTopics[0] || '';
-    const weakTopic = userData.weakTopics[0] || '';
-    const isRecordStreak = userData.streak && userData.streak === userData.maxStreak && userData.streak > 0;
+      // Новое: достижения, динамика, любимая тема
+      const achievements = await db.getRecentAchievements(user.chatId, 3);
+      const progressDynamics = await db.getProgressDynamics(user.chatId);
+      const favoriteTopic = userData.strongTopics[0] || userData.lastTopics[0] || '';
+      const weakTopic = userData.weakTopics[0] || '';
+      const isRecordStreak = userData.streak && userData.streak === userData.maxStreak && userData.streak > 0;
 
-    // Вариативный промпт для AI
-    const prompt = `Ты корпоративный наставник и мотиватор. Вот данные о сотруднике:
+      // Вариативный промпт для AI
+      const prompt = `Ты корпоративный наставник и мотиватор. Вот данные о сотруднике:
 - Уровень: ${userData.level} ${userData.levelName}
 - Прогресс: ${userData.progress}%
 - Последний урок: ${userData.lastLearningDate || 'нет данных'}
@@ -1226,27 +1227,31 @@ async function sendLearningReminders(env) {
 
 Сформулируй короткое (до 200 символов) мотивационное сообщение, поздравь с достижениями, подскажи, что осталось до следующей цели, предложи пройти урок по слабой теме, пожелай хорошего ${timeOfDay}. Используй дружелюбный стиль, эмодзи, вариативные фразы, вопросы, челленджи, поздравления, пожелания. Не повторяйся каждый день!`;
 
-    let message;
-    try {
-      message = await askCloudflareAI(prompt, env);
-      if (message.length > 220) message = message.slice(0, 220) + '...';
-    } catch (e) {
-      message = generateReminderMessage(userData); // fallback
-    }
-    // Кнопки для Telegram
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: '🎓 Начать урок', callback_data: 'learning_start' },
-          { text: '🏆 Мои достижения', callback_data: 'learning_achievements' }
-        ],
-        [
-          { text: '📈 Мой прогресс', callback_data: 'learning_progress' },
-          { text: '💡 Получить совет', callback_data: 'learning_advice' }
+      let message;
+      try {
+        message = await askCloudflareAI(prompt, env);
+        if (message.length > 220) message = message.slice(0, 220) + '...';
+      } catch (e) {
+        message = generateReminderMessage(userData); // fallback
+      }
+      // Кнопки для Telegram
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: '🎓 Начать урок', callback_data: 'learning_start' },
+            { text: '🏆 Мои достижения', callback_data: 'learning_achievements' }
+          ],
+          [
+            { text: '📈 Мой прогресс', callback_data: 'learning_progress' },
+            { text: '💡 Получить совет', callback_data: 'learning_advice' }
+          ]
         ]
-      ]
-    };
-    await sendTelegramMessage(userData.chatId, message, env, keyboard);
-    await db.updateLastMotivationSent(userData.chatId, now);
+      };
+      await sendTelegramMessage(userData.chatId, message, env, keyboard);
+      await db.updateLastMotivationSent(userData.chatId, now);
+      console.log(`[CRON] Sent motivation to ${userData.chatId}`);
+    } catch (err) {
+      console.error(`[CRON] Error for user ${user.chatId}:`, err);
+    }
   }
 }

@@ -12,37 +12,37 @@ const SHEET_CONFIG = {
   304728120: {
     name: 'Вина',
     category: 'Вина',
-    columns: ['Название', 'Сахар', 'Крепость', 'Страна', 'Описание']
+    columns: ['Название', 'Сахар', 'Крепость', 'Страна', 'Описание', 'Image ID']
   },
   // Граппа, Порто, Коньяк, Вермут
   475136119: {
     name: 'Граппа, Порто, Коньяк, Вермут',
     category: 'Граппа, Порто, Коньяк, Вермут',
-    columns: ['Название', 'Сахар', 'Крепость', 'Страна', 'Описание']
+    columns: ['Название', 'Сахар', 'Крепость', 'Страна', 'Описание', 'Image ID']
   },
   // Виски
   1464137901: {
     name: 'Виски',
     category: 'Виски',
-    columns: ['Название', 'Страна', 'Крепость', 'Тип', 'Выдержка', 'Описание']
+    columns: ['Название', 'Страна', 'Крепость', 'Тип', 'Выдержка', 'Описание', 'Image ID']
   },
   // Ром, Текила
   622932265: {
     name: 'Ром, Текила',
     category: 'Ром, Текила',
-    columns: ['Название', 'Сахар', 'Крепость', 'Страна', 'Описание']
+    columns: ['Название', 'Сахар', 'Крепость', 'Страна', 'Описание', 'Image ID']
   },
   // Джин, Водка, Ликеры
   1353666556: {
     name: 'Джин, Водка, Ликеры',
     category: 'Джин, Водка, Ликеры',
-    columns: ['Название', 'Сахар', 'Крепость', 'Страна', 'Описание']
+    columns: ['Название', 'Сахар', 'Крепость', 'Страна', 'Описание', 'Image ID']
   },
   // Пиво
   1693795279: {
     name: 'Пиво',
     category: 'Пиво',
-    columns: ['Название', 'Страна', 'Плотность', 'Крепость', 'Описание']
+    columns: ['Название', 'Страна', 'Плотность', 'Крепость', 'Описание', 'Image ID']
   }
 };
 
@@ -265,6 +265,8 @@ export async function loadWinesFromGoogleSheets(env) {
             wine.description = row[columnMapping.Описание] || '';
           }
           
+          wine.image_id = row[columnMapping['Image ID']] || '';
+
           // Добавляем вино только если есть название
           if (name && name.length > 3) {
             allWines.push(wine);
@@ -369,6 +371,8 @@ export async function loadWinesFromGoogleSheets(env) {
             drink.description = `${drink.category}: ${drink.ingredients}. Метод: ${drink.method}. Посуда: ${drink.glassware}. Лед: ${drink.ice}`;
           }
           
+          drink.image_id = row[columnMapping['Image ID']] || '';
+
           // Добавляем напиток только если есть название
           if (name && name.length > 3) {
             allWines.push(drink);
