@@ -252,6 +252,9 @@ export async function startLearning(chatId, env) {
         { text: '⚙️ Настройки', callback_data: 'learning_settings' }
       ],
       [
+        { text: '🎁 Магазин', callback_data: 'open_reward_shop' }
+      ],
+      [
         { text: '🔙 Главное меню', callback_data: 'main_menu' }
       ]
     ]

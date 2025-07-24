@@ -695,5 +695,34 @@ async function handleBuyReward(chatId, rewardId, env) {
   await db.prepare('UPDATE users SET experience_points = experience_points - ? WHERE chat_id = ?').bind(reward.price_xp, chatId).run();
   await db.prepare('UPDATE reward_shop SET quantity_left = quantity_left - 1 WHERE id = ?').bind(rewardId).run();
   await db.prepare('INSERT INTO reward_purchases (user_id, reward_id) VALUES (?, ?)').bind(chatId, rewardId).run();
-  await sendMessage(chatId, `🎉 Поздравляем! Вы купили приз: ${reward.name} за ${reward.price_xp} XP.`, env);
+
+  // Генерируем уникальный 8-значный код купона (латиница+цифры)
+  function generateCouponCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 8; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  }
+  const couponCode = generateCouponCode();
+
+  // Отправляем сотруднику сообщение с купоном
+  await sendMessage(chatId, `🎉 Поздравляем! Вы купили приз: <b>${reward.name}</b> за ${reward.price_xp} XP.\n\nВаш уникальный номер купона: <b>${couponCode}</b>\nПокажите этот код администратору для получения приза.`, env, 'HTML');
+
+  // Уведомляем админов
+  try {
+    const kv = env.WINE_CACHE;
+    const idsRaw = await kv.get('admin_authorized_ids');
+    if (idsRaw) {
+      const adminIds = JSON.parse(idsRaw);
+      const userName = user.first_name || user.username || user.last_name || `ID ${user.chat_id}`;
+      const adminMsg = `🛒 <b>Покупка приза</b>\nПользователь: <b>${userName}</b> (ID: ${user.chat_id})\nПриз: <b>${reward.name}</b>\nXP: ${reward.price_xp}\nКупон: <b>${couponCode}</b>`;
+      for (const adminId of adminIds) {
+        await sendMessage(adminId, adminMsg, env, 'HTML');
+      }
+    }
+  } catch (e) {
+    console.error('Ошибка при отправке уведомления админам о покупке приза:', e);
+  }
 } 

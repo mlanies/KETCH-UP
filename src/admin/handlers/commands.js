@@ -815,11 +815,90 @@ export class CommandsHandler {
     await this.telegram.sendMessage(chatId, 'Введите название нового приза:');
   }
 
-  // Обработка текстовых сообщений для добавления приза
+  // Обработка текстовых сообщений для добавления или редактирования приза
   async handleTextForReward(chatId, text) {
     const state = await getUserState(chatId, this.env);
     if (!state) return false;
     const db = this.env.DB;
+    // --- МНОГОШАГОВОЕ РЕДАКТИРОВАНИЕ ПРИЗА ---
+    if (state.editingRewardId) {
+      // 1. Получаем текущий приз
+      const reward = await db.prepare('SELECT * FROM reward_shop WHERE id = ?').bind(state.editingRewardId).first();
+      if (!reward) {
+        await this.telegram.sendMessage(chatId, '❌ Приз не найден.');
+        await clearUserState(chatId, this.env);
+        return true;
+      }
+      // 2. Обработка шагов
+      if (state.step === 'edit_reward_name') {
+        state.newName = (text === '-') ? reward.name : text;
+        state.step = 'edit_reward_price';
+        await setUserState(chatId, state, this.env);
+        await this.telegram.sendMessage(chatId, `Текущая стоимость: ${reward.price_xp} XP\nВведите новую стоимость (или - чтобы оставить текущее):`);
+        return true;
+      }
+      if (state.step === 'edit_reward_price') {
+        let newPrice;
+        if (text === '-') {
+          newPrice = reward.price_xp;
+        } else {
+          newPrice = parseInt(text);
+          if (isNaN(newPrice) || newPrice <= 0) {
+            await this.telegram.sendMessage(chatId, 'Стоимость должна быть положительным числом. Введите снова:');
+            return true;
+          }
+        }
+        state.newPrice = newPrice;
+        state.step = 'edit_reward_quantity';
+        await setUserState(chatId, state, this.env);
+        await this.telegram.sendMessage(chatId, `Текущее количество: ${reward.quantity}\nВведите новое количество (или - чтобы оставить текущее):`);
+        return true;
+      }
+      if (state.step === 'edit_reward_quantity') {
+        let newQuantity;
+        if (text === '-') {
+          newQuantity = reward.quantity;
+        } else {
+          newQuantity = parseInt(text);
+          if (isNaN(newQuantity) || newQuantity <= 0) {
+            await this.telegram.sendMessage(chatId, 'Количество должно быть положительным целым числом. Введите снова:');
+            return true;
+          }
+        }
+        state.newQuantity = newQuantity;
+        state.step = 'edit_reward_desc';
+        await setUserState(chatId, state, this.env);
+        await this.telegram.sendMessage(chatId, `Текущее описание: ${reward.description || '-'}\nВведите новое описание (или - чтобы оставить текущее):`);
+        return true;
+      }
+      if (state.step === 'edit_reward_desc') {
+        const newDesc = (text === '-') ? (reward.description || '') : text;
+        // --- ЛОГИРОВАНИЕ ---
+        console.log(`[ADMIN][EDIT_REWARD] chat_id=${chatId}, reward_id=${reward.id}, old=`, reward, ', new=', {
+          name: state.newName,
+          price_xp: state.newPrice,
+          quantity: state.newQuantity,
+          description: newDesc
+        });
+        // --- ОБНОВЛЕНИЕ ---
+        // Если количество меняется, quantity_left тоже корректируем (если увеличили общее, увеличиваем остаток на разницу)
+        let newQuantityLeft = reward.quantity_left;
+        if (state.newQuantity > reward.quantity) {
+          newQuantityLeft += (state.newQuantity - reward.quantity);
+        } else if (state.newQuantity < reward.quantity) {
+          // Если уменьшили, но остаток больше нового общего, обнуляем остаток
+          newQuantityLeft = Math.max(0, Math.min(newQuantityLeft, state.newQuantity));
+        }
+        await db.prepare('UPDATE reward_shop SET name = ?, price_xp = ?, quantity = ?, quantity_left = ?, description = ? WHERE id = ?')
+          .bind(state.newName, state.newPrice, state.newQuantity, newQuantityLeft, newDesc, reward.id).run();
+        await clearUserState(chatId, this.env);
+        await this.telegram.sendMessage(chatId, '✅ Приз успешно обновлён!');
+        await this.handleRewards(chatId);
+        return true;
+      }
+      return false;
+    }
+    // --- ДОБАВЛЕНИЕ ПРИЗА ---
     if (state.step === 'awaiting_reward_name') {
       state.name = text;
       state.step = 'awaiting_reward_price';
@@ -872,6 +951,15 @@ export class CommandsHandler {
   }
 
   async handleEditReward(chatId, rewardId) {
-    await this.telegram.sendMessage(chatId, '✏️ Редактирование призов пока не реализовано.');
+    const db = this.env.DB;
+    // Проверяем, что приз существует
+    const reward = await db.prepare('SELECT * FROM reward_shop WHERE id = ?').bind(rewardId).first();
+    if (!reward) {
+      await this.telegram.sendMessage(chatId, '❌ Приз не найден.');
+      return;
+    }
+    // Сохраняем состояние редактирования
+    await setUserState(chatId, { editingRewardId: rewardId, step: 'edit_reward_name' }, this.env);
+    await this.telegram.sendMessage(chatId, `Текущее название: ${reward.name}\nВведите новое название (или - чтобы оставить текущее):`);
   }
 } 
