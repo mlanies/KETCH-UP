@@ -96,4 +96,4 @@ frontend/
 npm run deploy
 ```
 
-URL после деплоя: https://wine-app.2gc.ru 
+URL после деплоя: https://your-domain 

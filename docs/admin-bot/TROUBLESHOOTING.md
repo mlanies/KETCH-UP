@@ -14,7 +14,7 @@
 curl "https://api.telegram.org/bot<ADMIN_BOT_TOKEN>/getWebhookInfo"
 
 # Установить webhook заново
-curl "https://api.telegram.org/bot<ADMIN_BOT_TOKEN>/setWebhook?url=https://telegram-wine-bot-admin.2gc.workers.dev"
+curl "https://api.telegram.org/bot<ADMIN_BOT_TOKEN>/setWebhook?url=https://your-domain"
 
 # Проверить логи
 npx wrangler tail telegram-wine-bot-admin
@@ -179,7 +179,7 @@ curl "https://api.telegram.org/bot<ADMIN_BOT_TOKEN>/deleteWebhook"
 npx wrangler deploy --env admin
 
 # 3. Установить webhook заново
-curl "https://api.telegram.org/bot<ADMIN_BOT_TOKEN>/setWebhook?url=https://telegram-wine-bot-admin.2gc.workers.dev"
+curl "https://api.telegram.org/bot<ADMIN_BOT_TOKEN>/setWebhook?url=https://your-domain"
 
 # 4. Проверить работу
 curl "https://api.telegram.org/bot<ADMIN_BOT_TOKEN>/getWebhookInfo"

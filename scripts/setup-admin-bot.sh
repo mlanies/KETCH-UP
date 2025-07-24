@@ -79,7 +79,7 @@ fi
 # Устанавливаем webhook
 echo ""
 echo "🔗 Установка webhook..."
-WEBHOOK_URL="https://telegram-wine-bot-admin.2gc.workers.dev"
+WEBHOOK_URL="https://your-domain"
 WEBHOOK_RESPONSE=$(curl -s "https://api.telegram.org/bot${ADMIN_BOT_TOKEN}/setWebhook?url=${WEBHOOK_URL}")
 
 if echo "$WEBHOOK_RESPONSE" | grep -q '"ok":true'; then

@@ -15,7 +15,7 @@
 
 ### Отдельный воркер
 - **Файл:** `src/admin-bot.js`
-- **Endpoint:** `https://telegram-wine-bot-admin.2gc.workers.dev`
+- **Endpoint:** `https://your-domain`
 - **Environment:** `admin` в wrangler.toml
 - **Токен:** `ADMIN_BOT_TOKEN` (отдельный от основного бота)
 
@@ -53,7 +53,7 @@ npx wrangler deploy --env admin
 
 ### 4. Установка webhook
 ```bash
-curl "https://api.telegram.org/bot<ADMIN_BOT_TOKEN>/setWebhook?url=https://telegram-wine-bot-admin.2gc.workers.dev"
+curl "https://api.telegram.org/bot<ADMIN_BOT_TOKEN>/setWebhook?url=https://your-domain"
 ```
 
 ### 5. Проверка webhook

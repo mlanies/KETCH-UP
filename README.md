@@ -248,10 +248,10 @@ npm run deploy
 ### 5. Настройка Telegram Bot
 ```bash
 # Установка webhook для backend
-curl -X POST https://telegram-wine-bot.2gc.workers.dev/set-webhook
+curl -X POST https://your-domain/set-webhook
 
 # Обновление Web App URL в BotFather
-# Установить URL: https://wine-app.2gc.ru/
+# Установить URL: https://your-domain/
 ```
 
 ## 📱 Использование
@@ -295,7 +295,7 @@ curl -X POST https://telegram-wine-bot.2gc.workers.dev/set-webhook
 
 ## 🔧 API эндпоинты
 
-### Backend Worker (`telegram-wine-bot.2gc.workers.dev`)
+### Backend Worker (`your-domain`)
 
 #### Статистика пользователя
 ```bash
@@ -324,7 +324,7 @@ POST /delete-webhook
 GET /webhook-info
 ```
 
-### Frontend Worker (`wine-app.2gc.ru`)
+### Frontend Worker (`your-domain`)
 
 #### Мини-приложение
 - **Главная страница**: `/`
@@ -368,10 +368,10 @@ GET /webhook-info
 **Решение**: Проверьте подключение к базе данных D1 и убедитесь, что схема применена корректно.
 
 ### Проблема: Webhook возвращает 404
-**Решение**: Убедитесь, что backend worker развернут и доступен по адресу `telegram-wine-bot.2gc.workers.dev`.
+**Решение**: Убедитесь, что backend worker развернут и доступен по адресу `your-domain`.
 
 ### Проблема: Frontend не загружается
-**Решение**: Проверьте, что frontend worker развернут и доступен по адресу `wine-app.2gc.ru`.
+**Решение**: Проверьте, что frontend worker развернут и доступен по адресу `your-domain`.
 
 ## 📈 Мониторинг и логи
 

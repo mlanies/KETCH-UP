@@ -1,0 +1,14 @@
+# Пример конфигурации для Cloudflare Wrangler
+# Переименуйте этот файл в wrangler.toml и заполните своими значениями
+
+# [name]
+# [type]
+# [account_id]
+# [workers_dev]
+# [route]
+# [zone_id]
+# [vars]
+# [kv_namespaces]
+# [triggers]
+# [build]
+# [env] 

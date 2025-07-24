@@ -1,6 +1,6 @@
 // Утилиты для работы с backend API
 
-const API_BASE_URL = 'https://telegram-wine-bot.2gc.workers.dev';
+const API_BASE_URL = 'https://your-domain';
 
 export async function fetchUserStats(chatId) {
   try {

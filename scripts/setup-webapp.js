@@ -18,8 +18,8 @@ const rl = readline.createInterface({
 const WEBAPP_CONFIG = {
   name: "Wine Learning Bot",
   description: "Обучение официантов по ассортименту напитков ресторана KETCH UP",
-  icon: "🍷",
-  url: "https://telegram-wine-bot.2gc.workers.dev/miniweb",
+  icon: "��",
+  url: "https://your-domain/miniweb",
   commands: [
     { command: "start", description: "Запустить бота" },
     { command: "webapp", description: "Открыть Web App" },
@@ -35,7 +35,7 @@ const keyboard = {
     [
       { 
         text: '🌐 Открыть Web App', 
-        web_app: { url: '${WEBAPP_CONFIG.url}' } 
+        web_app: { url: 'https://your-domain/miniweb' } 
       }
     ],
     // ... другие кнопки
@@ -221,7 +221,7 @@ const keyboard = {
     [
       { 
         text: '🌐 Открыть Web App', 
-        web_app: { url: '${WEBAPP_CONFIG.url}' } 
+        web_app: { url: 'https://your-domain/miniweb' } 
       }
     ],
     // ... другие кнопки
