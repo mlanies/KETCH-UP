@@ -65,5 +65,5 @@ test-*.js
 *.sqlite3
 
 # Локальные конфигурации
-wrangler.toml.local
+wrangler.toml
 config.local.js 
