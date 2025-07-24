@@ -192,9 +192,6 @@ frontend/
 **Назначение:** Все HTTP запросы к backend
 
 ```javascript
-// Базовый URL
-const API_BASE_URL = 'https://telegram-wine-bot.2gc.workers.dev';
-
 // Пользовательские данные
 export async function fetchUserStats(chatId)
 export async function fetchUserAchievements(chatId)

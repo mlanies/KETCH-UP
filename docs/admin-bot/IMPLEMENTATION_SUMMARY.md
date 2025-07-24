@@ -76,11 +76,9 @@ binding = "WINE_CACHE"
 
 # Переменные
 [env.admin.vars]
-WORKER_URL = "https://telegram-wine-bot-admin.2gc.workers.dev"
 ```
 
 #### Webhook
-- URL: `https://telegram-wine-bot-admin.2gc.workers.dev`
 - Обработка callback query и текстовых команд
 
 ## 🔧 Исправленные проблемы
