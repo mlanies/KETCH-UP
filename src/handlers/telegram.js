@@ -293,9 +293,6 @@ export async function sendWelcomeMessage(chatId, env) {
         { text: '🔄 Обновить данные', callback_data: 'refresh_data' }
       ],
       [
-        { text: '🎁 Магазин', callback_data: 'open_reward_shop' }
-      ],
-      [
         { text: '🤖 Спросить у ИИ', callback_data: 'ask_ai' }
       ]
     ]
@@ -326,9 +323,6 @@ export async function sendMainMenu(chatId, env) {
       ],
       [
         { text: '🔄 Обновить данные', callback_data: 'refresh_data' }
-      ],
-      [
-        { text: '🎁 Магазин', callback_data: 'open_reward_shop' }
       ],
       [
         { text: '🤖 Спросить у ИИ', callback_data: 'ask_ai' }
@@ -657,7 +651,7 @@ async function showRewardShop(chatId, env) {
   } else {
     for (const r of rewards.results) {
       if (r.quantity_left > 0) {
-        message += `• <b>${r.name}</b> — ${r.price_xp} XP\nОсталось: ${r.quantity_left}\n`;
+        message += `• <b>${r.name}</b> — ${r.price_xp} XP\nОсталось: ${r.quantity_left} шт.\n`;
       }
     }
   }
