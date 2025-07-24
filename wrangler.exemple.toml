@@ -12,3 +12,30 @@
 # [triggers]
 # [build]
 # [env] 
+
+[env.guest]
+name = "telegram-wine-bot-guest"
+main = "src/guest-bot.js"
+compatibility_date = "2024-01-01"
+
+# Пример переменных окружения (заполните своими значениями)
+[env.guest.vars]
+TELEGRAM_BOT_TOKEN = "<guest_bot_token>"
+
+# Пример привязки базы данных (если нужно)
+#[[env.guest.d1_databases]]
+#binding = "DB"
+#database_name = "wine-bot-db"
+#database_id = "your-d1-database-id"
+
+# Пример привязки KV (если нужно)
+#[[env.guest.kv_namespaces]]
+#binding = "WINE_CACHE"
+#id = "your-kv-namespace-id"
+#preview_id = "your-kv-preview-namespace-id"
+
+# Пример маршрута (замените на свой)
+#[env.guest.triggers]
+#routes = [
+#  "https://your-guest-worker.domain/*"
+#] 
