@@ -513,6 +513,9 @@ export class CommandsHandler {
         case fullAction.startsWith('delete_reward_'):
           await this.handleDeleteReward(chatId, fullAction.replace('delete_reward_', ''));
           break;
+        case fullAction.startsWith('edit_reward_'):
+          await this.handleEditReward(chatId, fullAction.replace('edit_reward_', ''));
+          break;
         case fullAction === 'help':
           await this.handleHelp(chatId);
           break;
@@ -787,6 +790,7 @@ export class CommandsHandler {
     const db = this.env.DB;
     const rewards = await db.prepare('SELECT * FROM reward_shop ORDER BY price_xp ASC').all();
     let message = '<b>🎁 Магазин призов</b>\n\n';
+    const keyboard = [];
     if (rewards.results.length === 0) {
       message += 'Нет доступных призов.';
     } else {
@@ -794,13 +798,15 @@ export class CommandsHandler {
         message += `• <b>${r.name}</b> — ${r.price_xp} XP\n` +
           `ID: ${r.id} | Всего: ${r.quantity} | Осталось: ${r.quantity_left} | Активен: ${r.is_active ? 'Да' : 'Нет'}\n` +
           `${r.description || ''}\n\n`;
+        keyboard.push([
+          { text: '✏️ Редактировать', callback_data: `admin_edit_reward_${r.id}` },
+          { text: '🗑 Удалить', callback_data: `admin_delete_reward_${r.id}` }
+        ]);
       }
     }
-    const keyboard = this.telegram.createInlineKeyboard([
-      [{ text: '➕ Добавить приз', callback_data: 'admin_add_reward' }],
-      [{ text: '🔙 Назад', callback_data: 'admin_main_menu' }]
-    ]);
-    await this.telegram.sendMessageWithKeyboard(chatId, message, keyboard);
+    keyboard.push([{ text: '➕ Добавить приз', callback_data: 'admin_add_reward' }]);
+    keyboard.push([{ text: '🔙 Назад', callback_data: 'admin_main_menu' }]);
+    await this.telegram.sendMessageWithKeyboard(chatId, message, this.telegram.createInlineKeyboard(keyboard));
   }
 
   // Добавление нового приза (многошагово)
@@ -863,5 +869,9 @@ export class CommandsHandler {
     await db.prepare('UPDATE reward_shop SET is_active = 0 WHERE id = ?').bind(rewardId).run();
     await this.telegram.sendMessage(chatId, 'Приз удалён.');
     await this.handleRewards(chatId);
+  }
+
+  async handleEditReward(chatId, rewardId) {
+    await this.telegram.sendMessage(chatId, '✏️ Редактирование призов пока не реализовано.');
   }
 } 
