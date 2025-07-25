@@ -1,13 +1,14 @@
 // src/guest-bot.js
 // Гостевой бот для посетителей ресторана
 
-import { sendMessage } from './handlers/telegramApi.js';
-import { sendGuestMainMenu, sendGuestMenu, sendGuestDrinks, startGuestAIFoodChat, handleGuestAIPrefsMessage, guestMenuCategoryList, guestMenuCategoryDrinks, guestShowDrinkDetails, guestAlcoholCategoryList, guestAlcoholCategoryDrinks } from './handlers/guest/menu.js';
+import { sendMessage, sendMessageWithKeyboard } from './handlers/telegramApi.js';
+import { startGuestAIFoodChat, handleGuestAIPrefsMessage, guestMenuCategoryList, guestMenuCategoryDrinks, guestShowDrinkDetails, guestAlcoholCategoryList, guestAlcoholCategoryDrinks } from './handlers/guest/menu.js';
 import {
   isAwaitingFeedback,
   setAwaitingFeedback,
   handleGuestFeedbackMessage
 } from './handlers/guest/feedback.js';
+import { showMenuCategories, showCategoryDrinks, showDrinkDetails, showAlcoholCategories } from './handlers/guest/menu-common.js';
 
 // Обработка входящих сообщений от Telegram
 async function handleGuestMessage(message, env) {
@@ -38,48 +39,48 @@ async function handleCallbackQuery(callbackQuery, env) {
   const chatId = callbackQuery.from.id;
   const data = callbackQuery.data;
 
-  if (data === 'guest_menu') {
-    await guestMenuCategoryList(chatId, env);
+  if (data === 'section_menu') {
+    await showMenuCategories(chatId, env);
     return;
   }
-  if (data === 'guest_alcohol') {
-    await guestAlcoholCategoryList(chatId, env);
+  if (data === 'section_alcohol') {
+    await showAlcoholCategories(chatId, env);
     return;
   }
-  if (data.startsWith('guest_category_')) {
-    const categoryType = data.replace('guest_category_', '');
-    await guestMenuCategoryDrinks(categoryType, chatId, env);
+  if (data.startsWith('category_')) {
+    const categoryType = data.replace('category_', '');
+    await showCategoryDrinks(categoryType, chatId, env);
     return;
   }
-  if (data.startsWith('guest_alc_category_')) {
-    const categoryType = data.replace('guest_alc_category_', '');
-    await guestAlcoholCategoryDrinks(categoryType, chatId, env);
+  if (data.startsWith('drink_')) {
+    const drinkId = data.replace('drink_', '');
+    await showDrinkDetails(drinkId, chatId, env);
     return;
   }
-  if (data.startsWith('guest_drink_')) {
-    const drinkId = data.replace('guest_drink_', '');
-    await guestShowDrinkDetails(drinkId, chatId, env);
+  if (data === 'refresh_data') {
+    const { refreshWineData } = await import('./handlers/data.js');
+    await refreshWineData(env);
+    await sendMessageWithKeyboard(chatId, '✅ Данные обновлены из Google Sheets!', { inline_keyboard: [[{ text: '🏠 Главное меню', callback_data: 'main_menu' }]] }, env);
     return;
   }
 
   switch (data) {
-    case 'guest_drinks':
-      await sendGuestDrinks(chatId, env);
+    case 'main_menu':
+      await sendGuestMainMenu(chatId, env);
       break;
     case 'guest_feedback':
       setAwaitingFeedback(chatId);
-      await sendMessage(chatId, '✍️ Напишите ваш отзыв о визите одним сообщением. Мы ценим ваше мнение!', env);
+      await sendMessage(chatId, '✍️ Напишите ваш отзыв о визите одним сообщением. Мы ценим ваше мнение!', env, undefined);
       break;
     case 'guest_ai_food_chat':
       await startGuestAIFoodChat(chatId, env);
       break;
     case 'guest_ask_ai':
-      await sendMessage(chatId, '🤖 Задайте вопрос о напитках или сочетаниях — наш AI-ассистент ответит!', env);
+      await sendMessage(chatId, '🤖 Задайте вопрос о напитках или сочетаниях — наш AI-ассистент ответит!', env, undefined);
       break;
     case 'guest_about':
-      await sendMessage(chatId, '🏪 Ресторан KETCH UP\nАдрес: ...\nВремя работы: ...\nАкции: ...', env);
+      await sendMessage(chatId, '🏪 Ресторан KETCH UP\nАдрес: ...\nВремя работы: ...\nАкции: ...', env, undefined);
       break;
-    case 'guest_main_menu':
     default:
       await sendGuestMainMenu(chatId, env);
       break;
@@ -105,6 +106,21 @@ async function sendWelcomeMessage(chatId, env) {
 async function sendHelpMessage(chatId, env) {
   const text = 'ℹ️ Этот бот создан для гостей ресторана KETCH UP.\n\nВы можете посмотреть меню, напитки, оставить отзыв или задать вопрос AI-ассистенту.';
   await sendGuestMainMenu(chatId, env, text);
+}
+
+async function sendGuestMainMenu(chatId, env, customText) {
+  const text = customText || '🏠 Главное меню. Выберите раздел:';
+  const keyboard = {
+    inline_keyboard: [
+      [ { text: '🍽️ Меню', callback_data: 'section_menu' }, { text: '🍷 Алкоголь', callback_data: 'section_alcohol' } ],
+      [ { text: '✍️ Оставить отзыв', callback_data: 'guest_feedback' } ],
+      [ { text: '🤖 AI-подбор блюд', callback_data: 'guest_ai_food_chat' } ],
+      [ { text: '🤖 Спросить у AI', callback_data: 'guest_ask_ai' } ],
+      [ { text: '🏪 О заведении', callback_data: 'guest_about' } ],
+      [ { text: '🔄 Обновить данные', callback_data: 'refresh_data' } ]
+    ]
+  };
+  await sendMessageWithKeyboard(chatId, text, keyboard, env);
 }
 
 // Основная функция обработки webhook
